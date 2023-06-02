@@ -12,7 +12,8 @@ def tables_database_init(con, cursor):
                 CREATE TABLE IF NOT EXISTS 'tables'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
                     'name' TEXT,
-                    'date' TEXT)
+                    'date' TEXT,
+                    'time' TEXT)
     """)
     con.commit()
 
@@ -46,9 +47,12 @@ def delete_table(con, cursor, name):
 
 
 def insert_value(con, cursor, value, db_name):
-    cursor.execute(
-        f"INSERT INTO '{db_name}' ('tg_id', 'time', 'name', 'change') VALUES ('{value['tg_id']}', '{value['time']}', '{value['username']}', {value['change']})")
-    con.commit()
+    try:
+        cursor.execute(
+            f"INSERT INTO '{db_name}' ('tg_id', 'time', 'name', 'change') VALUES ('{value['tg_id']}', '{value['time']}', '{value['username']}', {value['change']})")
+        con.commit()
+    except Exception as e:
+        print("FUNC: insert_value ERR:", e)
 
 
 def get_all(con, cursor, name):
@@ -66,8 +70,8 @@ def get_status_by_id(con, cursor, id, db_name):
     return cursor.fetchall()
 
 
-def get_status_by_no(con, cursor, id, name):
-    cursor.execute(f"select * from '{name}' where db_id = {id} order by 'time'")
+def get_status_by_no(con, cursor, id, db_name):
+    cursor.execute(f"select * from '{db_name}' where db_id = {id} order by 'time'")
     return cursor.fetchall()
 
 
@@ -80,7 +84,7 @@ def change_queue(con, cursor, db_id1, db_id2, db_name):
             f"""UPDATE '{db_name}' SET tg_id = '{db_id1[1]}', name = '{db_id1[2]}', change = -1 WHERE db_id = {int(db_id2[0])}""")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: change_queue ERR:", e)
 
 
 def update_change(con, cursor, db_id, change, db_name):
@@ -89,7 +93,7 @@ def update_change(con, cursor, db_id, change, db_name):
             f"""UPDATE '{db_name}' SET tg_id = '{db_id[1]}', name = '{db_id[2]}', time = '{db_id[3]}', change = {int(change)} WHERE db_id = {int(db_id[0])}""")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: update_change ERR:", e)
 
 
 def update_name(con, cursor, tg_id, name, db_name):
@@ -97,7 +101,7 @@ def update_name(con, cursor, tg_id, name, db_name):
         cursor.execute(f"""UPDATE '{db_name}' SET name = '{name}' WHERE tg_id = '{tg_id}'""")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: update_name ERR:", e)
 
 
 def make_admin(con, cursor, value):
@@ -105,7 +109,7 @@ def make_admin(con, cursor, value):
         cursor.execute(f"INSERT INTO 'admins' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: make_admin ERR:", e)
 
 
 def is_admin(con, cursor, tg_id):
@@ -116,7 +120,7 @@ def is_admin(con, cursor, tg_id):
         else:
             return False
     except Exception as e:
-        print(e)
+        print("FUNC: is_admin ERR:", e)
         return False
 
 
@@ -136,7 +140,7 @@ def cancel_take(con, cursor, id, name):
         con.commit()
 
     except Exception as e:
-        print(e)
+        print("FUNC: cancel_take ERR:", e)
 
 
 def is_exist_table(con, cursor, name):
@@ -147,7 +151,7 @@ def is_exist_table(con, cursor, name):
         else:
             return False
     except Exception as e:
-        print(e)
+        print("FUNC: is_exist_table ERR:", e)
         return False
 
 
@@ -158,10 +162,11 @@ def get_all_tables(con, cursor):
 
 def insert_table(con, cursor, value):
     try:
-        cursor.execute(f"INSERT INTO 'tables' ('name', 'date') VALUES ('{value['name']}', '{value['date']}')")
+        cursor.execute(
+            f"INSERT INTO 'tables' ('name', 'date', 'time') VALUES ('{value['name']}', '{value['date']}', '{value['time']}')")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: insert_table ERR:", e)
 
 
 def delete_table_from_table(con, cursor, name):
@@ -169,7 +174,7 @@ def delete_table_from_table(con, cursor, name):
         cursor.execute(f"DELETE FROM 'tables' where name = '{name}'")
         con.commit()
     except Exception as e:
-        print(e)
+        print("FUNC: delete_table_from_table ERR:", e)
 
 
 def get_table_name(con, cursor, no):
@@ -178,6 +183,22 @@ def get_table_name(con, cursor, no):
     if len(tables) >= no:
         return tables[no - 1][1]
     return None
+
+
+def get_table_time(con, cursor, no):
+    tables = get_all_tables(con, cursor)
+    out = -1
+    if len(tables) >= no:
+        return tables[no - 1][3]
+    return None
+
+
+def set_table_time(con, cursor, table_name, time):
+    try:
+        cursor.execute(f"""UPDATE 'tables' SET time = '{time}' WHERE name = '{table_name}'""")
+        con.commit()
+    except Exception as e:
+        print("FUNC: set_table_time ERR:", e)
 
 
 """FOR TESTS"""
