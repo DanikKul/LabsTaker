@@ -36,18 +36,22 @@ def handle_start(message):
 
 @bot.message_handler(commands=['take'])
 def handle_take(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_take_handler)
 
 
 def callback_take_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
-        close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    bot.send_message(message.chat.id, text="Для того чтобы занять очередь, напишите любое сообщение")
-    bot.register_next_step_handler(message, callback_take2_handler, message.text)
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        bot.send_message(message.chat.id, text="Для того чтобы занять очередь, напишите любое сообщение")
+        bot.register_next_step_handler(message, callback_take2_handler, get_table_name(con_l, cursor_l, int(message.text)))
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 def callback_take2_handler(message, name):
@@ -74,59 +78,71 @@ def callback_take2_handler(message, name):
 
 @bot.message_handler(commands=['status'])
 def handle_status(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_status_handler)
 
 
 def callback_status_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
-        close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    if not get_status_by_id(con_l, cursor_l, message.chat.id, message.text):
-        bot.send_message(message.chat.id, f"Никто не занял очередь :(")
-    else:
-        bot.send_message(message.chat.id, f"{get_status_by_id(con_l, cursor_l, message.chat.id, message.text)[0][0]}")
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, int(message.text))):
+            bot.send_message(message.chat.id, f"Никто не занял очередь :(")
+        else:
+            bot.send_message(message.chat.id, f"{get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, int(message.text)))[0][0]}")
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 @bot.message_handler(commands=['list'])
 def handle_list(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_list_handler)
 
 
 def callback_list_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
-        close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    lst = get_all(con_l, cursor_l, message.text)
-    if not lst:
-        bot.send_message(message.chat.id, text="Никто не занял очередь :(")
-    else:
-        s = ""
-        for human in lst:
-            s += f"№{str(human[0])} {str(human[2])} Время: {str(human[3])}\n"
-        close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=s)
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        lst = get_all(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text)))
+        if not lst:
+            bot.send_message(message.chat.id, text="Никто не занял очередь :(")
+        else:
+            s = ""
+            for human in lst:
+                s += f"№{str(human[0])} {str(human[2])} Время: {str(human[3])}\n"
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=s)
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 @bot.message_handler(commands=['change'])
 def handle_change(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_change_handler)
 
 
 def callback_change_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
-        close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    bot.send_message(message.chat.id, text=f'Введите номер человека с которым хотите поменяться')
-    bot.register_next_step_handler(message, callback_change2_handler, message.text)
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        bot.send_message(message.chat.id, text=f'Введите номер человека с которым хотите поменяться')
+        bot.register_next_step_handler(message, callback_change2_handler, get_table_name(con_l, cursor_l, int(message.text)))
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 def callback_change2_handler(message, name):
@@ -158,36 +174,43 @@ def callback_change2_handler(message, name):
 
 @bot.message_handler(commands=['cancel'])
 def handle_cancel(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_cancel_handler)
 
 
 def callback_cancel_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        cancel_take(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, int(message.text)))
         close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    cancel_take(con_l, cursor_l, message.chat.id, message.text)
-    close_connection(con_l, cursor_l)
-    bot.send_message(message.chat.id, text='Ты освободил свое место в очереди')
-
+        bot.send_message(message.chat.id, text='Ты освободил свое место в очереди')
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 @bot.message_handler(commands=['edit'])
 def handle_edit(message):
-    bot.send_message(message.chat.id, 'Введите имя очереди из доступных в /queues')
+    bot.send_message(message.chat.id, 'Введите номер очереди из доступных в /queues')
     bot.register_next_step_handler(message, callback_edit_handler)
 
 
 def callback_edit_handler(message):
-    con_l, cursor_l = database_connect(config['db_name'])
-    if not is_exist_table(con_l, cursor_l, message.text):
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+            close_connection(con_l, cursor_l)
+            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            return
+        bot.send_message(message.chat.id, text='Напиши имя и фамилию')
+        bot.register_next_step_handler(message, callback_edit2_handler, get_table_name(con_l, cursor_l, int(message.text)))
         close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-        return
-    close_connection(con_l, cursor_l)
-    bot.send_message(message.chat.id, text='Напиши имя и фамилию')
-    bot.register_next_step_handler(message, callback_edit2_handler, message.text)
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 def callback_edit2_handler(message, name):
@@ -284,7 +307,8 @@ def handle_queues(message):
         s = 'Очереди:\n'
         idx = 1
         for table in tables:
-            s += f"№{str(idx)} {table[1]}"
+            s += f"№{str(idx)} {table[1]}\n"
+            idx += 1
         bot.send_message(message.chat.id, text=s)
     else:
         bot.send_message(message.chat.id, text="Нет ни одной очереди :(")

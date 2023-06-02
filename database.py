@@ -172,6 +172,14 @@ def delete_table_from_table(con, cursor, name):
         print(e)
 
 
+def get_table_name(con, cursor, no):
+    tables = get_all_tables(con, cursor)
+    out = -1
+    if len(tables) >= no:
+        return tables[no - 1][1]
+    return None
+
+
 """FOR TESTS"""
 if __name__ == "__main__":
     con, cursor = database_connect('queue')
