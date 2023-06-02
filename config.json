@@ -1,4 +1,7 @@
 {
   "token": "6184496396:AAGR6eMPtGxaii0pnXTQ8Dp-qB7jOLOrIzc",
-  "db_name": "queue"
+  "db_name": "queue",
+  "db_admin": "admins",
+  "db_tables": "tables",
+  "pass": "12345678"
 }
