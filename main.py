@@ -144,7 +144,7 @@ def callback_change2_handler(message, name):
         bot.send_message(message.chat.id, 'Запрос на изменение очереди принят')
         update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0], no, name)
         if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0] != -1:
-            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0], get_status_by_no(con_l, cursor_l, no, name)[0])
+            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0], get_status_by_no(con_l, cursor_l, no, name)[0], name)
             bot.send_message(message.chat.id, 'Очередь изменена')
         else:
             bot.send_message(message.chat.id,

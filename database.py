@@ -71,13 +71,13 @@ def get_status_by_no(con, cursor, id, name):
     return cursor.fetchall()
 
 
-def change_queue(con, cursor, db_id1, db_id2):
+def change_queue(con, cursor, db_id1, db_id2, db_name):
     try:
         cursor.execute(
-            f"""UPDATE 'queue' SET tg_id = '{db_id2[1]}', name = '{db_id2[2]}', change = -1 WHERE db_id = {int(db_id1[0])}""")
+            f"""UPDATE '{db_name}' SET tg_id = '{db_id2[1]}', name = '{db_id2[2]}', change = -1 WHERE db_id = {int(db_id1[0])}""")
         con.commit()
         cursor.execute(
-            f"""UPDATE 'queue' SET tg_id = '{db_id1[1]}', name = '{db_id1[2]}', change = -1 WHERE db_id = {int(db_id2[0])}""")
+            f"""UPDATE '{db_name}' SET tg_id = '{db_id1[1]}', name = '{db_id1[2]}', change = -1 WHERE db_id = {int(db_id2[0])}""")
         con.commit()
     except Exception as e:
         print(e)
@@ -112,10 +112,8 @@ def is_admin(con, cursor, tg_id):
     try:
         cursor.execute(f"SELECT * FROM 'admins' WHERE tg_id = '{tg_id}'")
         if len(cursor.fetchall()) >= 1:
-            print('true')
             return True
         else:
-            print('false')
             return False
     except Exception as e:
         print(e)
@@ -127,14 +125,14 @@ def cancel_take(con, cursor, id, name):
         cursor.execute(
             f"""DELETE FROM '{name}' WHERE tg_id = '{id}'"""
         )
-        lst = get_all(con, cursor)
+        lst = get_all(con, cursor, name)
         delete_table(con, cursor, name)
         database_init(con, cursor, name)
         if lst:
             for human in lst:
                 insert_value(con, cursor, {'tg_id': human[1], 'time': human[3],
                                            'username': human[2],
-                                           'change': human[4]})
+                                           'change': human[4]}, name)
         con.commit()
 
     except Exception as e:
