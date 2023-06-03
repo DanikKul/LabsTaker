@@ -231,6 +231,9 @@ def handle_cancel(message):
             close_connection(con_l, cursor_l)
             bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
+        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no)):
+            bot.send_message(message.chat.id, f"Вы не заняли очередь :(")
+            return
         cancel_take(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no))
         close_connection(con_l, cursor_l)
         bot.send_message(message.chat.id, text='Ты освободил свое место в очереди')
