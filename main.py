@@ -48,231 +48,347 @@ def handle_start(message):
     if is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, parse_mode='MarkdownV2',
                          text='_Для админов_\n`/admin_create` \- _Создать очередь_\n`/admin_delete` \- _Удалить очередь_\n`/admin_time` \- _Изменить время занятия очереди_\n`/admin_edit` \- _Принудительно изменяет имя человека, занявшего очередь_\n`/admin_remove` \- _Принудительно удаляет человека из очереди_\n`/admin_change` \- _Принудительно меняет двух человек местами_')
-    bot.send_message(message.chat.id, text="Напиши `/help имя\_команды`, чтобы узнать о ней подробнее", parse_mode='MarkdownV2')
+    bot.send_message(message.chat.id, text="Напиши `/help имя\_команды`, чтобы узнать о ней подробнее",
+                     parse_mode='MarkdownV2')
 
 
 @bot.message_handler(commands=['help'])
 def handle_help(message):
-    command: str = tt.util.extract_arguments(message.text)
-    if not command:
-        handle_start(message)
-        return
-    command = command.replace('/', '')
+    markup = tt.types.InlineKeyboardMarkup()
+    for command in help_strings:
+        markup.add(tt.types.InlineKeyboardButton(f"{command}", callback_data=f"helpbutton {command}"))
+    bot.send_message(message.chat.id, "Выберите команду", reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('helpbutton'))
+def callback_query_take(call: tt.types.CallbackQuery):
+    command = call.data[11:]
+    print(command)
     if help_strings.get(command):
-        bot.send_message(message.chat.id, text=help_strings[command], parse_mode="MarkdownV2")
+        bot.send_message(call.message.chat.id, text=help_strings[command], parse_mode="MarkdownV2")
     else:
-        bot.send_message(message.chat.id, text='Такой команды нет')
-        bot.send_message(message.chat.id, text='Ознакомьтесь с перечнем команд, написав `/start` или `/help`',
+        bot.send_message(call.message.chat.id, text='Такой команды нет')
+        bot.send_message(call.message.chat.id, text='Ознакомьтесь с перечнем команд, написав `/start` или `/help`',
                          parse_mode='MarkdownV2')
+    bot.delete_message(call.message.chat.id, call.message.message_id)
 
 
 @bot.message_handler(commands=['take'])
 def handle_take(message):
     try:
         no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
         no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
+        try:
+            con_l, cursor_l = database_connect(config['db_name'])
+            datetime = get_table_time(con_l, cursor_l, no).split(' ')
+            day, month, year = map(int, datetime[0].split('-'))
+            hour, minute = map(int, datetime[1].split(':'))
+            time = dt.now(pytz.timezone('Europe/Minsk'))
+            time = time.replace(tzinfo=None)
+            if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
+                bot.send_message(message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
+                return
+            db_name = get_table_name(con_l, cursor_l, int(no))
+            lst = get_all(con_l, cursor_l, db_name)
+            if lst is not None:
+                for human in lst:
+                    if human[1] == str(message.chat.id):
+                        close_connection(con_l, cursor_l)
+                        bot.send_message(message.chat.id, text=f'Вы уже заняли очередь')
+                        return
+            time_s = time.strftime("%H:%M:%S:%f")
+            insert_value(con_l, cursor_l, {'tg_id': message.chat.id, 'time': time,
+                                           'username': f"{message.from_user.first_name if message.from_user.first_name is not None else ''} {message.from_user.last_name if message.from_user.last_name is not None else ''}",
+                                           'change': -1}, db_name)
+            bot.send_message(message.chat.id,
+                             text=f'Время получения запроса: {time_s}')
+            bot.send_message(message.chat.id, text=f'Вы заняли очередь в {get_table_name(con_l, cursor_l, no)}')
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            return
+        except Exception as e:
+            bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+            print("FUNC: callback_take_handler ERR:", e)
+    except Exception as e:
+        con_l, cursor_l = database_connect(config['db_name'])
+        markup = tt.types.InlineKeyboardMarkup()
+        tables = get_all_tables(con_l, cursor_l)
+        idx = 1
+        for table in tables:
+            markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"takebutton {idx}"))
+            idx += 1
+        bot.send_message(message.chat.id, "Занять очередь", reply_markup=markup)
+        close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('takebutton'))
+def callback_query_take(call: tt.types.CallbackQuery):
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        no = int(call.data[11:])
         datetime = get_table_time(con_l, cursor_l, no).split(' ')
         day, month, year = map(int, datetime[0].split('-'))
         hour, minute = map(int, datetime[1].split(':'))
         time = dt.now(pytz.timezone('Europe/Minsk'))
         time = time.replace(tzinfo=None)
         if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
-            bot.send_message(message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
+            bot.send_message(call.message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
+            bot.delete_message(call.message.chat.id, call.message.message_id)
             return
         db_name = get_table_name(con_l, cursor_l, int(no))
         lst = get_all(con_l, cursor_l, db_name)
         if lst is not None:
             for human in lst:
-                if human[1] == str(message.chat.id):
+                if human[1] == str(call.message.chat.id):
                     close_connection(con_l, cursor_l)
-                    bot.send_message(message.chat.id, text=f'Вы уже заняли очередь')
+                    bot.send_message(call.message.chat.id, text=f'Вы уже заняли очередь')
+                    bot.delete_message(call.message.chat.id, call.message.message_id)
                     return
         time_s = time.strftime("%H:%M:%S:%f")
-        insert_value(con_l, cursor_l, {'tg_id': message.chat.id, 'time': time,
-                                       'username': f"{message.from_user.first_name if message.from_user.first_name is not None else ''} {message.from_user.last_name if message.from_user.last_name is not None else ''}",
+        insert_value(con_l, cursor_l, {'tg_id': call.message.chat.id, 'time': time,
+                                       'username': f"{call.message.chat.first_name if call.message.chat.first_name is not None else ''} {call.message.chat.last_name if call.message.chat.last_name is not None else ''}",
                                        'change': -1}, db_name)
-        bot.send_message(message.chat.id,
+        bot.send_message(call.message.chat.id,
                          text=f'Время получения запроса: {time_s}')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text=f'Вы заняли очередь в {get_table_name(con_l, cursor_l, no)}')
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_take_handler ERR:", e)
 
 
 @bot.message_handler(commands=['status'])
 def handle_status(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"statusbutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('statusbutton'))
+def callback_query_status(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[13:])
         con_l, cursor_l = database_connect(config['db_name'])
         if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no)):
-            bot.send_message(message.chat.id, f"Вы не заняли очередь :(")
+        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
         else:
-            bot.send_message(message.chat.id,
-                             f"{get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no))[0][0]}")
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             f"{get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no))[0][0]}")
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_status_handler ERR:", e)
 
 
 @bot.message_handler(commands=['list'])
 def handle_list(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"listbutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('listbutton'))
+def callback_query_list(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[11:])
         con_l, cursor_l = database_connect(config['db_name'])
         if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
         lst = get_all_in_order(con_l, cursor_l, get_table_name(con_l, cursor_l, no))
         if not lst:
-            bot.send_message(message.chat.id, text="Никто не занял очередь :(")
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text="Никто не занял очередь :(")
+            close_connection(con_l, cursor_l)
+            return
         else:
-            s = ""
+            s = f"Очередь {get_table_name(con_l, cursor_l, no)}:\n"
             for human in lst:
                 s += f"№{str(human[0])} {str(human[2])} Время: {str(human[3])}\n"
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=s)
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text=s)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_list_handler ERR:", e)
 
 
 @bot.message_handler(commands=['change'])
 def handle_change(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"changebutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('changebutton'))
+def callback_query_change(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[13:])
         con_l, cursor_l = database_connect(config['db_name'])
         if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        bot.send_message(message.chat.id, text=f'Введите номер человека с которым хотите поменяться')
-        bot.register_next_step_handler(message, callback_change_handler,
-                                       get_table_name(con_l, cursor_l, no))
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        markup = tt.types.InlineKeyboardMarkup()
+        lst = get_all(con_l, cursor_l, get_table_name(con_l, cursor_l, no))
+        idx = 1
+        for human in lst:
+            markup.add(tt.types.InlineKeyboardButton(f"№{human[0]} {human[2]}",
+                                                     callback_data=f"change2button {human[0]} {get_table_name(con_l, cursor_l, no)}"))
+            idx += 1
+        bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_change_handler ERR:", e)
 
 
-def callback_change_handler(message, name):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('change2button'))
+def callback_change_handler(call):
     no: int
     try:
-        no = int(message.text)
+        data = call.data.split(' ')
+        no = int(data[1])
+        db_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
-        lst = get_all(con_l, cursor_l, name)
+        lst = get_all(con_l, cursor_l, db_name)
         if not lst:
-            bot.send_message(message.chat.id, text="Никто не занял очередь :(")
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text="Никто не занял очередь :(")
             return
         if len(lst) < no:
-            bot.send_message(message.chat.id, text="Такого номера не существует")
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text="Такого номера не существует")
             return
-        bot.send_message(message.chat.id, 'Запрос на изменение очереди принят')
-        update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0], no, name)
-        if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0] != -1:
-            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1],
-                             text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} поменялся с тобой (№{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0]})")
-            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0],
-                         get_status_by_no(con_l, cursor_l, no, name)[0], name)
-            bot.send_message(message.chat.id, 'Очередь изменена')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Запрос на изменение очереди принят')
+        update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0], no, db_name)
+        if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0] != -1:
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
+                             text=f"{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][2]} поменялся с тобой (№{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0]})")
+            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0],
+                         get_status_by_no(con_l, cursor_l, no, db_name)[0], db_name)
+            bot.send_message(call.message.chat.id, 'Очередь изменена')
         else:
-            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1], text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0]})")
-            bot.send_message(message.chat.id,
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
+                             text=f"{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0]})")
+            bot.send_message(call.message.chat.id,
                              'Второй человек тоже должен поменяться с тобой местом чтобы очередь изменилась')
         close_connection(con_l, cursor_l)
 
     except Exception as e:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
         print("FUNC: callback_change2_handler ERR:", e)
-        bot.send_message(message.chat.id, 'Такого номера не существует')
+        bot.send_message(call.message.chat.id, 'Такого номера не существует')
 
 
 @bot.message_handler(commands=['cancel'])
 def handle_cancel(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"cancelbutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('cancelbutton'))
+def callback_query_cancel(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[13:])
         con_l, cursor_l = database_connect(config['db_name'])
         if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no)):
-            bot.send_message(message.chat.id, f"Вы не заняли очередь :(")
+        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
             return
-        cancel_take(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no))
+        cancel_take(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no))
         close_connection(con_l, cursor_l)
-        bot.send_message(message.chat.id, text='Ты освободил свое место в очереди')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text='Ты освободил свое место в очереди')
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_cancel_handler ERR:", e)
 
 
 @bot.message_handler(commands=['edit'])
 def handle_edit(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"editbutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('editbutton'))
+def callback_query_edit(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[11:])
         con_l, cursor_l = database_connect(config['db_name'])
         if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, no)):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no)):
-            bot.send_message(message.chat.id, f"Вы не заняли очередь :(")
+        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
             return
-        bot.send_message(message.chat.id, text='Напиши имя и фамилию')
-        bot.register_next_step_handler(message, callback_edit_handler,
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text='Напиши имя и фамилию')
+        bot.register_next_step_handler(call.message, callback_edit_handler,
                                        get_table_name(con_l, cursor_l, no))
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_edit_handler ERR:", e)
 
 
@@ -306,20 +422,28 @@ def handle_queues(message):
 
 @bot.message_handler(commands=['time'])
 def handle_time(message):
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    idx = 1
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"timebutton {idx}"))
+        idx += 1
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('timebutton'))
+def callback_query_time(call: tt.types.CallbackQuery):
     try:
-        no = tt.util.extract_arguments(message.text)
-        if not no:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
-        no = int(no)
-        if no <= 0:
-            bot.send_message(message.chat.id, text="Напишите в аргументах команды номер очереди из /queues")
-            return
+        no = int(call.data[11:])
         con_l, cursor_l = database_connect(config['db_name'])
         get_table_time(con_l, cursor_l, no)
-        bot.send_message(message.chat.id, text=get_table_time(con_l, cursor_l, no))
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text=get_table_time(con_l, cursor_l, no))
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_time_handler ERR:", e)
 
 
@@ -385,7 +509,9 @@ def callback_create2_handler(message, table_name):
                 return
         database_init(con_l, cursor_l, table_name)
         insert_table(con_l, cursor_l, {'name': table_name, 'date': dt.now(pytz.timezone('Europe/Minsk')),
-                                       'time': dt.strptime(f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}", '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M')})
+                                       'time': dt.strptime(
+                                           f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}",
+                                           '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M')})
         bot.send_message(message.chat.id, text=f"Очередь создана")
         close_connection(con_l, cursor_l)
     except Exception as e:
@@ -399,27 +525,36 @@ def handle_delete(message):
     if not is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
-    bot.send_message(message.chat.id, text="Удаление очереди")
-    bot.send_message(message.chat.id, text="Введи имя очереди, которую хочешь удалить")
-    bot.register_next_step_handler(message, callback_delete_handler)
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admindeletebutton {table[1]}"))
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
 
 
-def callback_delete_handler(message):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('admindeletebutton'))
+def callback_query_admin_delete(call: tt.types.CallbackQuery):
+    db_name = call.data[18:]
     con_l, cursor_l = database_connect(config['db_name'])
     tables = get_all_tables(con_l, cursor_l)
     exist = False
-    if message.text == 'admins' or message.text == 'tables':
-        bot.send_message(message.chat.id, text='Самый умный что-ли?')
+    if db_name == 'admins' or db_name == 'tables':
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text='Самый умный что-ли?')
         return
     for table in tables:
-        if table[1] == message.text:
+        if table[1] == db_name:
             exist = True
     if not exist:
-        bot.send_message(message.chat.id, text='Очередь с таким именем не существует')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text='Очередь с таким именем не существует')
         return
-    delete_table(con_l, cursor_l, message.text)
-    delete_table_from_table(con_l, cursor_l, message.text)
-    bot.send_message(message.chat.id, text=f"Очередь с именем {message.text} удалена")
+    delete_table(con_l, cursor_l, db_name)
+    delete_table_from_table(con_l, cursor_l, db_name)
+    bot.delete_message(call.message.chat.id, call.message.message_id)
+    bot.send_message(call.message.chat.id, text=f"Очередь с именем {db_name} удалена")
     close_connection(con_l, cursor_l)
 
 
@@ -429,33 +564,43 @@ def handle_settime(message):
     if not is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
-    bot.send_message(message.chat.id, text="Изменить время занятия очереди")
-    bot.send_message(message.chat.id, text="Введи имя очереди, которую хочешь изменить")
-    bot.register_next_step_handler(message, callback_settime_handler)
+    con_l, cursor_l = database_connect(config['db_name'])
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admintimebutton {table[1]}"))
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
 
 
-def callback_settime_handler(message):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('admintimebutton'))
+def callback_query_admin_time(call: tt.types.CallbackQuery):
     try:
+        db_name = call.data[16:]
         con_l, cursor_l = database_connect(config['db_name'])
         tables = get_all_tables(con_l, cursor_l)
         exist = False
         no = 0
-        if message.text == 'admins' or message.text == 'tables':
-            bot.send_message(message.chat.id, text='Самый умный что-ли?')
+        if db_name == 'admins' or db_name == 'tables':
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text='Самый умный что-ли?')
             return
         for table in tables:
-            if table[1] == message.text:
+            if table[1] == db_name:
                 exist = True
                 break
             no += 1
         if not exist:
-            bot.send_message(message.chat.id, text='Очередь с таким именем не существует')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text='Очередь с таким именем не существует')
             return
-        bot.send_message(message.chat.id, text=f"Введи новое время как в примере (DD-MM HH:MM)")
-        bot.register_next_step_handler(message, callback_settime2_handler, get_table_name(con_l, cursor_l, no + 1))
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text=f"Введи новое время как в примере (DD-MM HH:MM)")
+        bot.register_next_step_handler(call.message, callback_settime2_handler, get_table_name(con_l, cursor_l, no + 1))
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_settime_handler ERR:", e)
 
 
@@ -466,7 +611,9 @@ def callback_settime2_handler(message, table_name):
         day, month = map(int, datetime[0].split('-'))
         hour, minute = map(int, datetime[1].split(':'))
         if is_exist_table(con_l, cursor_l, table_name):
-            set_table_time(con_l, cursor_l, table_name, dt.strptime(f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}", '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M'))
+            set_table_time(con_l, cursor_l, table_name,
+                           dt.strptime(f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}",
+                                       '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M'))
             bot.send_message(message.chat.id, "Время занятия очереди изменено")
         else:
             print("Нет такой очереди")
@@ -481,50 +628,73 @@ def handle_admin_edit(message):
     if not is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
-    bot.send_message(message.chat.id, text="Принудительное редактирование очереди")
-    bot.send_message(message.chat.id, text="Введи номер очереди, которую хочешь изменить")
-    bot.register_next_step_handler(message, callback_admin_edit_handler)
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admineditbutton {table[1]}"))
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
 
 
-def callback_admin_edit_handler(message):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('admineditbutton'))
+def callback_query_admin_edit(call: tt.types.CallbackQuery):
     try:
+        db_name = call.data[16:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+        if not is_exist_table(con_l, cursor_l, db_name):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id,
+                             text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        bot.send_message(message.chat.id, text=f'Введите номер человека, у которого хочешь изменить имя')
-        bot.register_next_step_handler(message, callback_admin_edit2_handler,
-                                       get_table_name(con_l, cursor_l, int(message.text)))
+        markup = tt.types.InlineKeyboardMarkup()
+        lst = get_all(con_l, cursor_l, db_name)
+        if lst:
+            for human in lst:
+                markup.add(tt.types.InlineKeyboardButton(f"{human[2]}",
+                                                         callback_data=f"adminedit2button {human[0]} {db_name}"))
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
+        else:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text='Очередь пуста :(')
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_edit_handler ERR:", e)
 
 
-def callback_admin_edit2_handler(message, db_name):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminedit2button'))
+def callback_admin_edit2_handler(call):
     try:
+        data = call.data.split(' ')
+        db_id = int(data[1])
+        db_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
         lst = get_all(con_l, cursor_l, db_name)
         if lst:
-            if len(lst) >= int(message.text):
-                bot.send_message(message.chat.id, text='Введите имя и фамилию человека')
-                bot.register_next_step_handler(message, callback_admin_edit3_handler,
-                                               db_name, int(message.text))
+            if len(lst) >= db_id:
+                bot.delete_message(call.message.chat.id, call.message.message_id)
+                bot.send_message(call.message.chat.id, text='Введите имя и фамилию человека')
+                bot.register_next_step_handler(call.message, callback_admin_edit3_handler, db_name, db_id)
             else:
-                bot.send_message(message.chat.id, text='Неправильный номер')
+                bot.delete_message(call.message.chat.id, call.message.message_id)
+                bot.send_message(call.message.chat.id, text='Неправильный номер')
         else:
-            bot.send_message(message.chat.id, text='Очередь пуста :(')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text='Очередь пуста :(')
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_edit2_handler ERR:", e)
 
 
 def callback_admin_edit3_handler(message, db_name, no):
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        update_name(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, get_table_name(con_l, cursor_l, no))[0][1],
+        update_name(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
                     message.text, db_name)
         close_connection(con_l, cursor_l)
         bot.send_message(message.chat.id, text='Готово')
@@ -538,24 +708,31 @@ def handle_admin_change(message):
     if not is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
-    bot.send_message(message.chat.id, text="Принудительный обмен в очереди")
-    bot.send_message(message.chat.id, text="Введи номер очереди, которую хочешь изменить")
-    bot.register_next_step_handler(message, callback_admin_change_handler)
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"adminchangebutton {table[1]}"))
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
 
 
-def callback_admin_change_handler(message):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminchangebutton'))
+def callback_admin_change_handler(call):
     try:
+        db_name = call.data[18:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+        if not is_exist_table(con_l, cursor_l, db_name):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        bot.send_message(message.chat.id, text=f'Введи два номера людей через пробел, которых хочешь поменять')
-        bot.register_next_step_handler(message, callback_admin_change2_handler,
-                                       get_table_name(con_l, cursor_l, int(message.text)))
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, text=f'Введи два номера людей через пробел, которых хочешь поменять')
+        bot.register_next_step_handler(call.message, callback_admin_change2_handler, db_name)
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_change_handler ERR:", e)
 
 
@@ -585,44 +762,61 @@ def handle_admin_remove(message):
     if not is_admin(con_l, cursor_l, message.chat.id):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
-    bot.send_message(message.chat.id, text="Принудительное удаление из очереди")
-    bot.send_message(message.chat.id, text="Введи номер очереди, которую хочешь изменить")
-    bot.register_next_step_handler(message, callback_admin_remove_handler)
+    markup = tt.types.InlineKeyboardMarkup()
+    tables = get_all_tables(con_l, cursor_l)
+    for table in tables:
+        markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"adminremovebutton {table[1]}"))
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    close_connection(con_l, cursor_l)
 
 
-def callback_admin_remove_handler(message):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminremovebutton'))
+def callback_admin_remove_handler(call):
     try:
+        db_name = call.data[18:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, get_table_name(con_l, cursor_l, int(message.text))):
+        if not is_exist_table(con_l, cursor_l, db_name):
             close_connection(con_l, cursor_l)
-            bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        bot.send_message(message.chat.id, text=f'Номер человека которого ты хочешь удалить из очереди')
-        bot.register_next_step_handler(message, callback_admin_remove2_handler,
-                                       get_table_name(con_l, cursor_l, int(message.text)))
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        markup = tt.types.InlineKeyboardMarkup()
+        lst = get_all(con_l, cursor_l, db_name)
+        for human in lst:
+            markup.add(tt.types.InlineKeyboardButton(f"№{human[0]} {human[2]}", callback_data=f"adminremove2button {human[0]} {db_name}"))
+        bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_delete_handler ERR:", e)
 
 
-def callback_admin_remove2_handler(message, db_name):
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminremove2button'))
+def callback_admin_remove2_handler(call):
     try:
+        data = call.data.split(' ')
+        no = int(data[1])
+        db_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
         lst = get_all(con_l, cursor_l, db_name)
         if lst:
-            if len(lst) >= int(message.text):
-                print(get_status_by_no(con_l, cursor_l, int(message.text), db_name)[0], db_name)
-                cancel_take(con_l, cursor_l, get_status_by_no(con_l, cursor_l, int(message.text), db_name)[0][1],
+            if len(lst) >= no:
+                cancel_take(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
                             db_name)
-                bot.send_message(message.chat.id, 'Удалено')
+                bot.delete_message(call.message.chat.id, call.message.message_id)
+                bot.send_message(call.message.chat.id, 'Удалено')
             else:
-                bot.send_message(message.chat.id, text='Неправильный номер')
+                bot.delete_message(call.message.chat.id, call.message.message_id)
+                bot.send_message(call.message.chat.id, text='Неправильный номер')
         else:
-            bot.send_message(message.chat.id, text='Очередь пуста :(')
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, text='Очередь пуста :(')
         close_connection(con_l, cursor_l)
     except Exception as e:
-        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_delete2_handler ERR:", e)
 
 
