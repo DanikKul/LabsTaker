@@ -205,11 +205,13 @@ def callback_change_handler(message, name):
         bot.send_message(message.chat.id, 'Запрос на изменение очереди принят')
         update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0], no, name)
         if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0] != -1:
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1],
+                             text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} поменялся с тобой (№{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0]})")
             change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, message.chat.id, name)[0],
                          get_status_by_no(con_l, cursor_l, no, name)[0], name)
             bot.send_message(message.chat.id, 'Очередь изменена')
         else:
-            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1], text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} хочет с вами поменяться")
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1], text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][0]})")
             bot.send_message(message.chat.id,
                              'Второй человек тоже должен поменяться с тобой местом чтобы очередь изменилась')
         close_connection(con_l, cursor_l)
