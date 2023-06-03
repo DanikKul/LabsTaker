@@ -24,7 +24,7 @@ def database_init(con, cursor, name):
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
                     'tg_id' TEXT,
                     'name' TEXT,
-                    'time' TEXT,
+                    'time' timestamp,
                     'change' INTEGER)
     """)
     con.commit()
@@ -58,6 +58,12 @@ def insert_value(con, cursor, value, db_name):
 def get_all(con, cursor, name):
     cursor.execute(f"SELECT * from '{name}' ORDER BY 'db_id'")
     return cursor.fetchall()
+
+
+def get_all_in_order(con, cursor, name):
+    cursor.execute(f"SELECT * from '{name}' ORDER BY 'time'")
+    return cursor.fetchall()
+
 
 
 def close_connection(con, cursor):
