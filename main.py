@@ -82,9 +82,12 @@ def handle_take(message):
             close_connection(con_l, cursor_l)
             bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        hour, minute = map(int, get_table_time(con_l, cursor_l, no).split(':'))
+        datetime = get_table_time(con_l, cursor_l, no).split(' ')
+        day, month, year = map(int, datetime[0].split('-'))
+        hour, minute = map(int, datetime[1].split(':'))
         time = dt.now(pytz.timezone('Europe/Minsk'))
-        if time.hour * 60 + time.minute < hour * 60 + minute:
+        time = time.replace(tzinfo=None)
+        if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
             bot.send_message(message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
             return
         db_name = get_table_name(con_l, cursor_l, int(no))
@@ -206,6 +209,7 @@ def callback_change_handler(message, name):
                          get_status_by_no(con_l, cursor_l, no, name)[0], name)
             bot.send_message(message.chat.id, 'Очередь изменена')
         else:
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, name)[0][1], text=f"{get_status_by_id(con_l, cursor_l, message.chat.id, name)[0][2]} хочет с вами поменяться")
             bot.send_message(message.chat.id,
                              'Второй человек тоже должен поменяться с тобой местом чтобы очередь изменилась')
         close_connection(con_l, cursor_l)
@@ -258,6 +262,9 @@ def handle_edit(message):
             close_connection(con_l, cursor_l)
             bot.send_message(message.chat.id, text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
+        if not get_status_by_id(con_l, cursor_l, message.chat.id, get_table_name(con_l, cursor_l, no)):
+            bot.send_message(message.chat.id, f"Вы не заняли очередь :(")
+            return
         bot.send_message(message.chat.id, text='Напиши имя и фамилию')
         bot.register_next_step_handler(message, callback_edit_handler,
                                        get_table_name(con_l, cursor_l, no))
@@ -268,10 +275,14 @@ def handle_edit(message):
 
 
 def callback_edit_handler(message, name):
-    con_l, cursor_l = database_connect(config['db_name'])
-    update_name(con_l, cursor_l, message.chat.id, message.text, name)
-    close_connection(con_l, cursor_l)
-    bot.send_message(message.chat.id, text='Готово')
+    try:
+        con_l, cursor_l = database_connect(config['db_name'])
+        update_name(con_l, cursor_l, message.chat.id, message.text, name)
+        close_connection(con_l, cursor_l)
+        bot.send_message(message.chat.id, text='Готово')
+    except Exception as e:
+        bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print(e)
 
 
 @bot.message_handler(commands=['queues'])
@@ -282,7 +293,7 @@ def handle_queues(message):
         s = 'Очереди:\n'
         idx = 1
         for table in tables:
-            s += f"№{str(idx)} {table[1]}\n"
+            s += f"№{str(idx)} {table[1]} {table[3]}\n"
             idx += 1
         bot.send_message(message.chat.id, text=s)
     else:
@@ -350,7 +361,7 @@ def handle_create(message):
 def callback_create_handler(message):
     try:
         bot.send_message(message.chat.id,
-                         text="Введи время в которое нужно занять очередь, которую хочешь создать (например так 20:00)")
+                         text="Введи время в которое нужно занять очередь, которую хочешь создать (DD-MM HH:MM)")
         bot.register_next_step_handler(message, callback_create2_handler, message.text)
     except Exception as e:
         print("FUNC: callback_create_handler ERR:", e)
@@ -359,7 +370,9 @@ def callback_create_handler(message):
 def callback_create2_handler(message, table_name):
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        hour, minute = map(int, message.text.split(':'))
+        datetime = message.text.split(' ')
+        day, month = map(int, datetime[0].split('-'))
+        hour, minute = map(int, datetime[1].split(':'))
         tables = get_all_tables(con_l, cursor_l)
         if message.text == 'admins' or message.text == 'tables':
             bot.send_message(message.chat.id, text='Самый умный что-ли?')
@@ -370,7 +383,7 @@ def callback_create2_handler(message, table_name):
                 return
         database_init(con_l, cursor_l, table_name)
         insert_table(con_l, cursor_l, {'name': table_name, 'date': dt.now(pytz.timezone('Europe/Minsk')),
-                                       'time': dt.strptime(f"{hour}:{minute}", '%H:%M').strftime('%H:%M')})
+                                       'time': dt.strptime(f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}", '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M')})
         bot.send_message(message.chat.id, text=f"Очередь создана")
         close_connection(con_l, cursor_l)
     except Exception as e:
@@ -436,7 +449,7 @@ def callback_settime_handler(message):
         if not exist:
             bot.send_message(message.chat.id, text='Очередь с таким именем не существует')
             return
-        bot.send_message(message.chat.id, text=f"Введи новое время как в примере (20:00)")
+        bot.send_message(message.chat.id, text=f"Введи новое время как в примере (DD-MM HH:MM)")
         bot.register_next_step_handler(message, callback_settime2_handler, get_table_name(con_l, cursor_l, no + 1))
         close_connection(con_l, cursor_l)
     except Exception as e:
@@ -447,9 +460,11 @@ def callback_settime_handler(message):
 def callback_settime2_handler(message, table_name):
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        hour, minute = map(int, message.text.split(':'))
+        datetime = message.text.split(' ')
+        day, month = map(int, datetime[0].split('-'))
+        hour, minute = map(int, datetime[1].split(':'))
         if is_exist_table(con_l, cursor_l, table_name):
-            set_table_time(con_l, cursor_l, table_name, dt.strptime(f"{hour}:{minute}", '%H:%M').strftime('%H:%M'))
+            set_table_time(con_l, cursor_l, table_name, dt.strptime(f"{day}-{month}-{dt.now(pytz.timezone('Europe/Minsk')).year} {hour}:{minute}", '%d-%m-%Y %H:%M').strftime('%d-%m-%Y %H:%M'))
             bot.send_message(message.chat.id, "Время занятия очереди изменено")
         else:
             print("Нет такой очереди")

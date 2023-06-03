@@ -185,7 +185,6 @@ def delete_table_from_table(con, cursor, name):
 
 def get_table_name(con, cursor, no):
     tables = get_all_tables(con, cursor)
-    out = -1
     if len(tables) >= no:
         return tables[no - 1][1]
     return None
@@ -193,7 +192,6 @@ def get_table_name(con, cursor, no):
 
 def get_table_time(con, cursor, no):
     tables = get_all_tables(con, cursor)
-    out = -1
     if len(tables) >= no:
         return tables[no - 1][3]
     return None
