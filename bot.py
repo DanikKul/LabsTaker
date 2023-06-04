@@ -203,6 +203,10 @@ def handle_take(message: tt.types.Message):
         markup = tt.types.InlineKeyboardMarkup()
         tables = get_all_tables(con_l, cursor_l)
         idx = 1
+        if not tables:
+            bot.send_message(message.chat.id,
+                             text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+            return
         for table in tables:
             markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"takebutton {idx}"))
             idx += 1
@@ -256,6 +260,10 @@ def handle_status(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"statusbutton {idx}"))
         idx += 1
@@ -297,6 +305,10 @@ def handle_list(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"listbutton {idx}"))
         idx += 1
@@ -344,6 +356,10 @@ def handle_change(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"changebutton {idx}"))
         idx += 1
@@ -436,6 +452,10 @@ def handle_cancel(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"cancelbutton {idx}"))
         idx += 1
@@ -478,6 +498,10 @@ def handle_edit(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"editbutton {idx}"))
         idx += 1
@@ -553,6 +577,10 @@ def handle_time(message):
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
     idx = 1
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"timebutton {idx}"))
         idx += 1
@@ -669,6 +697,10 @@ def handle_delete(message):
     con_l, cursor_l = database_connect(config['db_name'])
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Создай хотя бы одну")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admindeletebutton {table[1]}"))
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
@@ -712,6 +744,10 @@ def handle_settime(message):
     con_l, cursor_l = database_connect(config['db_name'])
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Создай хотя бы одну")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admintimebutton {table[1]}"))
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
@@ -781,6 +817,10 @@ def handle_admin_edit(message):
         return
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Создай хотя бы одну")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"admineditbutton {table[1]}"))
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
@@ -869,6 +909,10 @@ def handle_admin_change(message):
         return
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Создай хотя бы одну")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"adminchangebutton {table[1]}"))
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
@@ -930,6 +974,10 @@ def handle_admin_remove(message):
         return
     markup = tt.types.InlineKeyboardMarkup()
     tables = get_all_tables(con_l, cursor_l)
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Создай хотя бы одну")
+        return
     for table in tables:
         markup.add(tt.types.InlineKeyboardButton(f"{table[1]}", callback_data=f"adminremovebutton {table[1]}"))
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
@@ -1006,4 +1054,9 @@ def handler_else(message):
         return
 
 
-bot.infinity_polling(skip_pending=True)
+def start():
+    bot.infinity_polling(skip_pending=True)
+
+
+if __name__ == "__main__":
+    start()
