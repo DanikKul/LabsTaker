@@ -4,4 +4,6 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
-    command: python3 ./bot.py
+    volumes:
+      - ./db:/db
+    command: bash /bot/run_bot.sh
