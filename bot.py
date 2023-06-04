@@ -1048,6 +1048,64 @@ def handle_ban(message):
     else:
         bot.send_message(message.chat.id, text="Вы не забанены")
 
+
+@bot.message_handler(commands=['admin_list'])
+def handle_admin_list(message):
+    if is_spam(message.chat.id):
+        return
+    con_l, cursor_l = database_connect(config['db_name'])
+    if not is_admin(con_l, cursor_l, message.chat.id):
+        bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
+        return
+    admins = get_all_admins(con_l, cursor_l)
+    if not admins:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одного админа")
+        return
+    s = "Администраторы:\n"
+    for admin in admins:
+        s += f"{admin[2]}\n"
+    bot.send_message(message.chat.id, text=s)
+    close_connection(con_l, cursor_l)
+
+
+@bot.message_handler(commands=['admin_kick'])
+def handle_admin_kick(message):
+    if is_spam(message.chat.id):
+        return
+    con_l, cursor_l = database_connect(config['db_name'])
+    if not is_admin(con_l, cursor_l, message.chat.id):
+        bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
+        return
+    markup = tt.types.InlineKeyboardMarkup()
+    admins = get_all_admins(con_l, cursor_l)
+    if not admins:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одного админа")
+        return
+    for human in admins:
+        markup.add(tt.types.InlineKeyboardButton(f"{human[2]}", callback_data=f"adminkickbutton {human[1]}"))
+    bot.send_message(message.chat.id, "Выбери админа", reply_markup=markup)
+    close_connection(con_l, cursor_l)
+
+
+@bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminkickbutton'))
+def callback_admin_kick_handler(call):
+    if is_spam(call.message.chat.id):
+        return
+    try:
+        data = call.data.split(' ')
+        tg_id = data[1]
+        con_l, cursor_l = database_connect(config['db_name'])
+        remove_admin(con_l, cursor_l, tg_id)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Админ удален')
+        close_connection(con_l, cursor_l)
+    except Exception as e:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
+        print("FUNC: callback_admin_delete2_handler ERR:", e)
+
 @bot.message_handler()
 def handler_else(message):
     if is_spam(message.chat.id):

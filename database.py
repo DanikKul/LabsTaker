@@ -60,6 +60,37 @@ def get_all(con, cursor, name):
     return cursor.fetchall()
 
 
+def get_all_admins(con, cursor):
+    cursor.execute(f"SELECT * from 'admins' ORDER BY 'db_id'")
+    return cursor.fetchall()
+
+
+def insert_admin(con, cursor, value):
+    try:
+        cursor.execute(
+            f"INSERT INTO 'admins' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
+        con.commit()
+    except Exception as e:
+        print("FUNC: insert_value ERR:", e)
+
+
+def remove_admin(con, cursor, id):
+    try:
+        cursor.execute(
+            f"""DELETE FROM 'admins' WHERE tg_id = '{id}'"""
+        )
+        lst = get_all_admins(con, cursor)
+        delete_table(con, cursor, 'admins')
+        admin_db_init(con, cursor)
+        if lst:
+            for human in lst:
+                insert_admin(con, cursor, {'tg_id': human[1], 'username': human[2]})
+        con.commit()
+
+    except Exception as e:
+        print("FUNC: cancel_take ERR:", e)
+
+
 def get_all_in_order(con, cursor, name):
     cursor.execute(f"SELECT * from '{name}' ORDER BY 'time'")
     return cursor.fetchall()
