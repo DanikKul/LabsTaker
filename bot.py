@@ -25,17 +25,17 @@ help_strings = {
             'если очередь пуста бот вернет "Никто не занял очередь :\("\)\.\n\nНомер и имя занимаемой очереди можно '
             'посмотреть в_ `/queues`',
     'exchange': '_Для того чтобы поменяться местами в очереди, напишите_ `/exchange`_, затем просто выберите одну из '
-              'предложенных очередей\. Затем появится новое меню с людьми в очереди\. Выберите того с кем хотите '
-              'поменяться\. После выбора ему отправится уведомление о том, что с ним хотят поменяться\. Если второй '
-              'человек поменяется с вами местами, вам придет сообщение, что второй человек подтвердил обмен\n\nПример '
-              'использования: _\n`/exchange`\n\n_В случае если очереди нет, бот ответит "Такой очереди нет, '
-              'посмотрите список доступных очередей в `/queues`", а если есть, тогда он вернет очередь \(если очередь '
-              'пуста бот вернет "Никто не занял очередь :\("\)\. Если же человека с таким номером не существует, '
-              'то бот напишет "Такого номера не существует"\. Если существует, то есть два варианта развитися '
-              'событий:\n\n1\) Вы запросили обмен первым, тогда бот напишет, что заявка на обмен принята и начато '
-              'ожидание заявки второго человека\.\n2\) Вы запросили обмен вторым, тогда бот напишет, что заявка '
-              'принята и очередь изменена\.\n\nНомер и имя занимаемой очереди можно посмотреть в_ `/queues`_\. Номер '
-              'человека в очереди посмотрите с помощью _`/list`_ \(Смотрите _`/help list`_\)_',
+                'предложенных очередей\. Затем появится новое меню с людьми в очереди\. Выберите того с кем хотите '
+                'поменяться\. После выбора ему отправится уведомление о том, что с ним хотят поменяться\. Если второй '
+                'человек поменяется с вами местами, вам придет сообщение, что второй человек подтвердил обмен\n\nПример '
+                'использования: _\n`/exchange`\n\n_В случае если очереди нет, бот ответит "Такой очереди нет, '
+                'посмотрите список доступных очередей в `/queues`", а если есть, тогда он вернет очередь \(если очередь '
+                'пуста бот вернет "Никто не занял очередь :\("\)\. Если же человека с таким номером не существует, '
+                'то бот напишет "Такого номера не существует"\. Если существует, то есть два варианта развитися '
+                'событий:\n\n1\) Вы запросили обмен первым, тогда бот напишет, что заявка на обмен принята и начато '
+                'ожидание заявки второго человека\.\n2\) Вы запросили обмен вторым, тогда бот напишет, что заявка '
+                'принята и очередь изменена\.\n\nНомер и имя занимаемой очереди можно посмотреть в_ `/queues`_\. Номер '
+                'человека в очереди посмотрите с помощью _`/list`_ \(Смотрите _`/help list`_\)_',
     'cancel': '_Для того чтобы отменить свое участие в очереди, напишите_ `/cancel`_, затем просто выберите одну из '
               'предложенных очередей\.\n\nПример использования: _\n`/cancel`\n\n_Номер и имя занимаемой очереди '
               'можно посмотреть в_ `/queues`',
@@ -68,7 +68,6 @@ msgs = 4
 max = 1
 ban = 300
 
-
 # _______________________________________________CONFIGURATION________________________________________________________ #
 
 
@@ -77,7 +76,7 @@ with open('config.json') as fp:
     config = json.load(fp)
 
 # Create telebot object
-bot = tt.TeleBot(token=config['token'], parse_mode=None)
+bot = tt.TeleBot(token=config['token'], parse_mode=None, num_threads=6)
 
 # Initialize databases
 con, cursor = database_connect(config['db_name'])
@@ -86,7 +85,7 @@ tables_database_init(con, cursor)
 close_connection(con, cursor)
 
 
-def is_spam(user_id):
+def is_spam(user_id: int) -> bool:
     try:
         usr = spams[user_id]
         usr["messages"] += 1
@@ -99,7 +98,7 @@ def is_spam(user_id):
         if usr["next_time"] >= int(tm.time()):
             if usr["messages"] >= msgs:
                 spams[user_id]["banned"] = tm.time() + ban
-                text = """Хотел поспамить? Получай бан на {} минут""".format(ban/60)
+                text = """Хотел поспамить? Получай бан на {} минут""".format(ban / 60)
                 bot.send_message(user_id, text)
                 return True
         else:
@@ -107,13 +106,18 @@ def is_spam(user_id):
             spams[user_id]["next_time"] = int(tm.time()) + max
     return False
 
+
+def is_logged(user_id) -> bool:
+    pass
+
+
 # __________________________________________TELEGRAM BOT HANDLERS_____________________________________________________ #
 
 # __________________________________________USER COMMANDS HANDLERS____________________________________________________ #
 
 
 @bot.message_handler(commands=['start'])
-def handle_start(message):
+def handle_start(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     bot.send_message(message.chat.id, text='Привет')
@@ -121,24 +125,25 @@ def handle_start(message):
     bot.send_message(message.chat.id, parse_mode='MarkdownV2',
                      text='`/take` \- _Занять очередь_\n`/status` \- _Посмотреть какой ты по счету в очереди_\n`/list` \- _Посмотреть всю очередь_\n`/change` \- _Поменяться местами с кем\-либо в очереди_\n`/cancel` \- _Перехотел сдавать_\n`/edit` \- _Изменить имя в очереди_\n`/queues` \- _Посмотреть список очередей_\n`/time` \- _Посмотреть во сколько нужно занимать в очереди_\n`/ban` \- _Посмотреть, сколько секунд осталось до разбана_')
     con_l, cursor_l = database_connect(config['db_name'])
-    if is_admin(con_l, cursor_l, message.chat.id):
+    if is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, parse_mode='MarkdownV2',
                          text='_Для админов_\n`/admin_create` \- _Создать очередь_\n`/admin_delete` \- _Удалить очередь_\n`/admin_time` \- _Изменить время занятия очереди_\n`/admin_edit` \- _Принудительно изменяет имя человека, занявшего очередь_\n`/admin_remove` \- _Принудительно удаляет человека из очереди_\n`/admin_change` \- _Принудительно меняет двух человек местами_')
     bot.send_message(message.chat.id, text="Напиши `/help имя\_команды`, чтобы узнать о ней подробнее",
                      parse_mode='MarkdownV2')
-    bot.send_message(message.chat.id, text="Предупреждаю, в боте стоит антиспам система, если вы начнете спамить вам выдадут бан на 5 минут, если это вас не остановит, вас еще и тг забанит на неопределенное время.")
+    bot.send_message(message.chat.id,
+                     text="Предупреждаю, в боте стоит антиспам система, если вы начнете спамить вам выдадут бан на 5 минут, если это вас не остановит, вас еще и тг забанит на неопределенное время.")
     close_connection(con_l, cursor_l)
 
 
 @bot.message_handler(commands=['help'])
-def handle_help(message):
+def handle_help(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     markup = tt.types.InlineKeyboardMarkup()
     for command in help_strings:
         markup.add(tt.types.InlineKeyboardButton(f"{command}", callback_data=f"helpbutton {command}"))
     con_l, cursor_l = database_connect(config['db_name'])
-    if is_admin(con_l, cursor_l, message.chat.id):
+    if is_admin(con_l, cursor_l, str(message.chat.id)):
         for command in help_admin_strings:
             markup.add(tt.types.InlineKeyboardButton(f"{command}", callback_data=f"helpbutton {command}"))
     bot.send_message(message.chat.id, "Выберите команду", reply_markup=markup)
@@ -179,8 +184,8 @@ def handle_take(message: tt.types.Message):
             if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
                 bot.send_message(message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
                 return
-            db_name = get_table_name(con_l, cursor_l, int(no))
-            lst = get_all(con_l, cursor_l, db_name)
+            table_name = get_table_name(con_l, cursor_l, int(no))
+            lst = get_all(con_l, cursor_l, table_name)
             if lst is not None:
                 for human in lst:
                     if human[1] == str(message.chat.id):
@@ -190,7 +195,7 @@ def handle_take(message: tt.types.Message):
             time_s = time.strftime("%H:%M:%S:%f")
             insert_value(con_l, cursor_l, {'tg_id': message.chat.id, 'time': time,
                                            'username': f"{message.from_user.first_name if message.from_user.first_name is not None else ''} {message.from_user.last_name if message.from_user.last_name is not None else ''}",
-                                           'change': -1}, db_name)
+                                           'change': -1}, table_name)
             bot.send_message(message.chat.id,
                              text=f'Время получения запроса: {time_s}')
             bot.send_message(message.chat.id, text=f'Вы заняли очередь в {get_table_name(con_l, cursor_l, no)}')
@@ -230,8 +235,8 @@ def callback_query_take(call: tt.types.CallbackQuery):
             bot.send_message(call.message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
             bot.delete_message(call.message.chat.id, call.message.message_id)
             return
-        db_name = get_table_name(con_l, cursor_l, int(no))
-        lst = get_all(con_l, cursor_l, db_name)
+        table_name = get_table_name(con_l, cursor_l, int(no))
+        lst = get_all(con_l, cursor_l, table_name)
         if lst is not None:
             for human in lst:
                 if human[1] == str(call.message.chat.id):
@@ -242,9 +247,10 @@ def callback_query_take(call: tt.types.CallbackQuery):
         time_s = time.strftime("%H:%M:%S:%f")
         insert_value(con_l, cursor_l, {'tg_id': call.message.chat.id, 'time': time,
                                        'username': f"{call.message.chat.first_name if call.message.chat.first_name is not None else ''} {call.message.chat.last_name if call.message.chat.last_name is not None else ''}",
-                                       'change': -1}, db_name)
+                                       'change': -1}, table_name)
         bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, text=f'Вы заняли очередь в {get_table_name(con_l, cursor_l, no)}\nВремя: {time_s}')
+        bot.send_message(call.message.chat.id,
+                         text=f'Вы заняли очередь в {get_table_name(con_l, cursor_l, no)}\nВремя: {time_s}')
         close_connection(con_l, cursor_l)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -253,7 +259,7 @@ def callback_query_take(call: tt.types.CallbackQuery):
 
 
 @bot.message_handler(commands=['status'])
-def handle_status(message):
+def handle_status(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -284,13 +290,13 @@ def callback_query_status(call: tt.types.CallbackQuery):
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+        if not get_status_by_id(con_l, cursor_l, str(call.message.chat.id), get_table_name(con_l, cursor_l, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
         else:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
-                             f"Вы {get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no))[0][0]} в очереди {get_table_name(con_l, cursor_l, no)}")
+                             f"Вы {get_status_by_id(con_l, cursor_l, str(call.message.chat.id), get_table_name(con_l, cursor_l, no))[0][0]} в очереди {get_table_name(con_l, cursor_l, no)}")
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
@@ -298,7 +304,7 @@ def callback_query_status(call: tt.types.CallbackQuery):
 
 
 @bot.message_handler(commands=['list'])
-def handle_list(message):
+def handle_list(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -349,7 +355,7 @@ def callback_query_list(call: tt.types.CallbackQuery):
 
 
 @bot.message_handler(commands=['exchange'])
-def handle_change(message):
+def handle_change(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -404,16 +410,16 @@ def callback_query_change(call: tt.types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('change2button'))
-def callback_change_handler(call):
+def callback_change_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     no: int
     try:
         data = call.data.split(' ')
         no = int(data[1])
-        db_name = data[2]
+        table_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         if not lst:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text="Никто не занял очередь :(")
@@ -424,16 +430,16 @@ def callback_change_handler(call):
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Запрос на изменение очереди принят')
-        update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0], no, db_name)
-        if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0] != -1:
-            bot.send_message(get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
-                             text=f"{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][2]} поменялся с тобой (№{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0]})")
-            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0],
-                         get_status_by_no(con_l, cursor_l, no, db_name)[0], db_name)
+        update_change(con_l, cursor_l, get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0], no, table_name)
+        if lst[no - 1][4] == get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0][0] != -1:
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, table_name)[0][1],
+                             text=f"{get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0][2]} поменялся с тобой (№{get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0][0]})")
+            change_queue(con_l, cursor_l, get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0],
+                         get_status_by_no(con_l, cursor_l, no, table_name)[0], table_name)
             bot.send_message(call.message.chat.id, 'Очередь изменена')
         else:
-            bot.send_message(get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
-                             text=f"{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(con_l, cursor_l, call.message.chat.id, db_name)[0][0]})")
+            bot.send_message(get_status_by_no(con_l, cursor_l, no, table_name)[0][1],
+                             text=f"{get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(con_l, cursor_l, str(call.message.chat.id), table_name)[0][0]})")
             bot.send_message(call.message.chat.id,
                              'Второй человек тоже должен поменяться с тобой местом чтобы очередь изменилась')
         close_connection(con_l, cursor_l)
@@ -445,7 +451,7 @@ def callback_change_handler(call):
 
 
 @bot.message_handler(commands=['cancel'])
-def handle_cancel(message):
+def handle_cancel(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -476,11 +482,11 @@ def callback_query_cancel(call: tt.types.CallbackQuery):
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+        if not get_status_by_id(con_l, cursor_l, str(call.message.chat.id), get_table_name(con_l, cursor_l, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
             return
-        cancel_take(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no))
+        cancel_take(con_l, cursor_l, str(call.message.chat.id), get_table_name(con_l, cursor_l, no))
         close_connection(con_l, cursor_l)
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text='Ты освободил свое место в очереди')
@@ -491,7 +497,7 @@ def callback_query_cancel(call: tt.types.CallbackQuery):
 
 
 @bot.message_handler(commands=['edit'])
-def handle_edit(message):
+def handle_edit(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -522,7 +528,7 @@ def callback_query_edit(call: tt.types.CallbackQuery):
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
-        if not get_status_by_id(con_l, cursor_l, call.message.chat.id, get_table_name(con_l, cursor_l, no)):
+        if not get_status_by_id(con_l, cursor_l, str(call.message.chat.id), get_table_name(con_l, cursor_l, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
             return
@@ -537,12 +543,12 @@ def callback_query_edit(call: tt.types.CallbackQuery):
         print("FUNC: callback_edit_handler ERR:", e)
 
 
-def callback_edit_handler(message, name):
+def callback_edit_handler(message: tt.types.Message, table_name: str):
     if is_spam(message.chat.id):
         return
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        update_name(con_l, cursor_l, message.chat.id, message.text, name)
+        update_name(con_l, cursor_l, str(message.chat.id), message.text, table_name)
         close_connection(con_l, cursor_l)
         bot.send_message(message.chat.id, text='Готово')
     except Exception as e:
@@ -551,7 +557,7 @@ def callback_edit_handler(message, name):
 
 
 @bot.message_handler(commands=['queues'])
-def handle_queues(message):
+def handle_queues(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -570,7 +576,7 @@ def handle_queues(message):
 
 
 @bot.message_handler(commands=['time'])
-def handle_time(message):
+def handle_time(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -604,15 +610,25 @@ def callback_query_time(call: tt.types.CallbackQuery):
         print("FUNC: callback_time_handler ERR:", e)
 
 
+@bot.message_handler(commands=['ban'])
+def handle_ban(message: tt.types.Message):
+    if is_spam(message.chat.id):
+        bot.send_message(message.chat.id,
+                         text=f"{int(spams[message.chat.id]['banned'] - int(tm.time()))} секунд осталось до разбана")
+        return
+    else:
+        bot.send_message(message.chat.id, text="Вы не забанены")
+
+
 # __________________________________________ADMIN COMMANDS HANDLERS___________________________________________________ #
 
 
 @bot.message_handler(commands=['supersecretadmin'])
-def handle_admin(message):
+def handle_admin(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if is_admin(con_l, cursor_l, message.chat.id):
+    if is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="Ты уже админ")
         return
     bot.send_message(message.chat.id, text="Введи пароль")
@@ -620,7 +636,7 @@ def handle_admin(message):
     close_connection(con_l, cursor_l)
 
 
-def callback_admin_handler(message):
+def callback_admin_handler(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     if message.text != config['pass']:
@@ -634,11 +650,11 @@ def callback_admin_handler(message):
 
 
 @bot.message_handler(commands=['admin_create'])
-def handle_create(message):
+def handle_create(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     bot.send_message(message.chat.id, text="Создание очереди")
@@ -647,7 +663,7 @@ def handle_create(message):
     bot.register_next_step_handler(message, callback_create_handler)
 
 
-def callback_create_handler(message):
+def callback_create_handler(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     try:
@@ -658,7 +674,7 @@ def callback_create_handler(message):
         print("FUNC: callback_create_handler ERR:", e)
 
 
-def callback_create2_handler(message, table_name):
+def callback_create2_handler(message: tt.types.Message, table_name: str):
     if is_spam(message.chat.id):
         return
     try:
@@ -667,7 +683,7 @@ def callback_create2_handler(message, table_name):
         day, month = map(int, datetime[0].split('-'))
         hour, minute = map(int, datetime[1].split(':'))
         tables = get_all_tables(con_l, cursor_l)
-        if message.text == 'admins' or message.text == 'tables':
+        if message.text == 'admins' or message.text == 'tables' or message.text == 'users':
             bot.send_message(message.chat.id, text='Самый умный что-ли?')
             return
         for table in tables:
@@ -687,11 +703,11 @@ def callback_create2_handler(message, table_name):
 
 
 @bot.message_handler(commands=['admin_delete'])
-def handle_delete(message):
+def handle_delete(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -711,34 +727,34 @@ def handle_delete(message):
 def callback_query_admin_delete(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
-    db_name = call.data[18:]
+    table_name = call.data[18:]
     con_l, cursor_l = database_connect(config['db_name'])
     tables = get_all_tables(con_l, cursor_l)
     exist = False
-    if db_name == 'admins' or db_name == 'tables':
+    if table_name == 'admins' or table_name == 'tables' or table_name == 'users':
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text='Самый умный что-ли?')
         return
     for table in tables:
-        if table[1] == db_name:
+        if table[1] == table_name:
             exist = True
     if not exist:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text='Очередь с таким именем не существует')
         return
-    delete_table(con_l, cursor_l, db_name)
-    delete_table_from_table(con_l, cursor_l, db_name)
+    delete_table(con_l, cursor_l, table_name)
+    delete_table_from_table(con_l, cursor_l, table_name)
     bot.delete_message(call.message.chat.id, call.message.message_id)
-    bot.send_message(call.message.chat.id, text=f"Очередь с именем {db_name} удалена")
+    bot.send_message(call.message.chat.id, text=f"Очередь с именем {table_name} удалена")
     close_connection(con_l, cursor_l)
 
 
 @bot.message_handler(commands=['admin_time'])
-def handle_settime(message):
+def handle_settime(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     con_l, cursor_l = database_connect(config['db_name'])
@@ -759,17 +775,17 @@ def callback_query_admin_time(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
-        db_name = call.data[16:]
+        table_name = call.data[16:]
         con_l, cursor_l = database_connect(config['db_name'])
         tables = get_all_tables(con_l, cursor_l)
         exist = False
         no = 0
-        if db_name == 'admins' or db_name == 'tables':
+        if table_name == 'admins' or table_name == 'tables' or table_name == 'users':
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text='Самый умный что-ли?')
             return
         for table in tables:
-            if table[1] == db_name:
+            if table[1] == table_name:
                 exist = True
                 break
             no += 1
@@ -787,7 +803,7 @@ def callback_query_admin_time(call: tt.types.CallbackQuery):
         print("FUNC: callback_settime_handler ERR:", e)
 
 
-def callback_settime2_handler(message, table_name):
+def callback_settime2_handler(message: tt.types.Message, table_name: str):
     if is_spam(message.chat.id):
         return
     try:
@@ -808,11 +824,11 @@ def callback_settime2_handler(message, table_name):
 
 
 @bot.message_handler(commands=['admin_edit'])
-def handle_admin_edit(message):
+def handle_admin_edit(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     markup = tt.types.InlineKeyboardMarkup()
@@ -832,20 +848,20 @@ def callback_query_admin_edit(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
-        db_name = call.data[16:]
+        table_name = call.data[16:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, db_name):
+        if not is_exist_table(con_l, cursor_l, table_name):
             close_connection(con_l, cursor_l)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
             return
         markup = tt.types.InlineKeyboardMarkup()
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         if lst:
             for human in lst:
                 markup.add(tt.types.InlineKeyboardButton(f"{human[2]}",
-                                                         callback_data=f"adminedit2button {human[0]} {db_name}"))
+                                                         callback_data=f"adminedit2button {human[0]} {table_name}"))
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
         else:
@@ -859,20 +875,20 @@ def callback_query_admin_edit(call: tt.types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminedit2button'))
-def callback_admin_edit2_handler(call):
+def callback_admin_edit2_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
         data = call.data.split(' ')
         db_id = int(data[1])
-        db_name = data[2]
+        table_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         if lst:
             if len(lst) >= db_id:
                 bot.delete_message(call.message.chat.id, call.message.message_id)
                 bot.send_message(call.message.chat.id, text='Введите имя и фамилию человека')
-                bot.register_next_step_handler(call.message, callback_admin_edit3_handler, db_name, db_id)
+                bot.register_next_step_handler(call.message, callback_admin_edit3_handler, table_name, db_id)
             else:
                 bot.delete_message(call.message.chat.id, call.message.message_id)
                 bot.send_message(call.message.chat.id, text='Неправильный номер')
@@ -886,13 +902,13 @@ def callback_admin_edit2_handler(call):
         print("FUNC: callback_admin_edit2_handler ERR:", e)
 
 
-def callback_admin_edit3_handler(message, db_name, no):
+def callback_admin_edit3_handler(message: tt.types.Message, table_name: str, no: int):
     if is_spam(message.chat.id):
         return
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        update_name(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
-                    message.text, db_name)
+        update_name(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, table_name)[0][1],
+                    message.text, table_name)
         close_connection(con_l, cursor_l)
         bot.send_message(message.chat.id, text='Готово')
     except Exception as e:
@@ -900,11 +916,11 @@ def callback_admin_edit3_handler(message, db_name, no):
 
 
 @bot.message_handler(commands=['admin_change'])
-def handle_admin_change(message):
+def handle_admin_change(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     markup = tt.types.InlineKeyboardMarkup()
@@ -920,13 +936,13 @@ def handle_admin_change(message):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminchangebutton'))
-def callback_admin_change_handler(call):
+def callback_admin_change_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
-        db_name = call.data[18:]
+        table_name = call.data[18:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, db_name):
+        if not is_exist_table(con_l, cursor_l, table_name):
             close_connection(con_l, cursor_l)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
@@ -934,7 +950,7 @@ def callback_admin_change_handler(call):
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text=f'Введи два номера людей через пробел, которых хочешь поменять')
-        bot.register_next_step_handler(call.message, callback_admin_change2_handler, db_name)
+        bot.register_next_step_handler(call.message, callback_admin_change2_handler, table_name)
         close_connection(con_l, cursor_l)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -942,17 +958,17 @@ def callback_admin_change_handler(call):
         print("FUNC: callback_admin_change_handler ERR:", e)
 
 
-def callback_admin_change2_handler(message, db_name):
+def callback_admin_change2_handler(message: tt.types.Message, table_name: str):
     if is_spam(message.chat.id):
         return
     try:
         con_l, cursor_l = database_connect(config['db_name'])
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         no1, no2 = map(int, message.text.split(' '))
         if lst:
             if len(lst) >= no1 and len(lst) >= no2:
-                change_queue(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no1, db_name)[0],
-                             get_status_by_no(con_l, cursor_l, no2, db_name)[0], db_name)
+                change_queue(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no1, table_name)[0],
+                             get_status_by_no(con_l, cursor_l, no2, table_name)[0], table_name)
                 bot.send_message(message.chat.id, 'Очередь изменена')
             else:
                 bot.send_message(message.chat.id, text='Неправильный номер')
@@ -965,11 +981,11 @@ def callback_admin_change2_handler(message, db_name):
 
 
 @bot.message_handler(commands=['admin_remove'])
-def handle_admin_remove(message):
+def handle_admin_remove(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     markup = tt.types.InlineKeyboardMarkup()
@@ -985,13 +1001,13 @@ def handle_admin_remove(message):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminremovebutton'))
-def callback_admin_remove_handler(call):
+def callback_admin_remove_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
-        db_name = call.data[18:]
+        table_name = call.data[18:]
         con_l, cursor_l = database_connect(config['db_name'])
-        if not is_exist_table(con_l, cursor_l, db_name):
+        if not is_exist_table(con_l, cursor_l, table_name):
             close_connection(con_l, cursor_l)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
@@ -999,10 +1015,10 @@ def callback_admin_remove_handler(call):
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         markup = tt.types.InlineKeyboardMarkup()
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         for human in lst:
             markup.add(tt.types.InlineKeyboardButton(f"№{human[0]} {human[2]}",
-                                                     callback_data=f"adminremove2button {human[0]} {db_name}"))
+                                                     callback_data=f"adminremove2button {human[0]} {table_name}"))
         bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
         close_connection(con_l, cursor_l)
     except Exception as e:
@@ -1012,19 +1028,18 @@ def callback_admin_remove_handler(call):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminremove2button'))
-def callback_admin_remove2_handler(call):
+def callback_admin_remove2_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
         data = call.data.split(' ')
         no = int(data[1])
-        db_name = data[2]
+        table_name = data[2]
         con_l, cursor_l = database_connect(config['db_name'])
-        lst = get_all(con_l, cursor_l, db_name)
+        lst = get_all(con_l, cursor_l, table_name)
         if lst:
             if len(lst) >= no:
-                cancel_take(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, db_name)[0][1],
-                            db_name)
+                cancel_take(con_l, cursor_l, get_status_by_no(con_l, cursor_l, no, table_name)[0][1], table_name)
                 bot.delete_message(call.message.chat.id, call.message.message_id)
                 bot.send_message(call.message.chat.id, 'Удалено')
             else:
@@ -1040,21 +1055,12 @@ def callback_admin_remove2_handler(call):
         print("FUNC: callback_admin_delete2_handler ERR:", e)
 
 
-@bot.message_handler(commands=['ban'])
-def handle_ban(message):
-    if is_spam(message.chat.id):
-        bot.send_message(message.chat.id, text=f"{int(spams[message.chat.id]['banned'] - int(tm.time()))} секунд осталось до разбана")
-        return
-    else:
-        bot.send_message(message.chat.id, text="Вы не забанены")
-
-
 @bot.message_handler(commands=['admin_list'])
-def handle_admin_list(message):
+def handle_admin_list(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     admins = get_all_admins(con_l, cursor_l)
@@ -1070,11 +1076,11 @@ def handle_admin_list(message):
 
 
 @bot.message_handler(commands=['admin_kick'])
-def handle_admin_kick(message):
+def handle_admin_kick(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
     con_l, cursor_l = database_connect(config['db_name'])
-    if not is_admin(con_l, cursor_l, message.chat.id):
+    if not is_admin(con_l, cursor_l, str(message.chat.id)):
         bot.send_message(message.chat.id, text="У тебя недостаточно прав для такой команды")
         return
     markup = tt.types.InlineKeyboardMarkup()
@@ -1090,7 +1096,7 @@ def handle_admin_kick(message):
 
 
 @bot.callback_query_handler(func=lambda call: call.data and call.data.startswith('adminkickbutton'))
-def callback_admin_kick_handler(call):
+def callback_admin_kick_handler(call: tt.types.CallbackQuery):
     if is_spam(call.message.chat.id):
         return
     try:
@@ -1106,8 +1112,9 @@ def callback_admin_kick_handler(call):
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_admin_delete2_handler ERR:", e)
 
+
 @bot.message_handler()
-def handler_else(message):
+def handler_else(message: tt.types.Message):
     if is_spam(message.chat.id):
         return
 

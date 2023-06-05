@@ -1,13 +1,14 @@
+import sqlite3
 import sqlite3 as db
 
 
-def database_connect(database_name: str):
+def database_connect(database_name: str) -> [sqlite3.Connection, sqlite3.Cursor]:
     con = db.connect(database_name)
     cursor = con.cursor()
     return con, cursor
 
 
-def tables_database_init(con, cursor):
+def tables_database_init(con: sqlite3.Connection, cursor: sqlite3.Cursor):
     cursor.execute("""
                 CREATE TABLE IF NOT EXISTS 'tables'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -18,9 +19,9 @@ def tables_database_init(con, cursor):
     con.commit()
 
 
-def database_init(con, cursor, name):
+def database_init(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name):
     cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS '{name}'
+                CREATE TABLE IF NOT EXISTS '{table_name}'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
                     'tg_id' TEXT,
                     'name' TEXT,
@@ -30,7 +31,17 @@ def database_init(con, cursor, name):
     con.commit()
 
 
-def admin_db_init(con, cursor):
+def db_init_users(con: sqlite3.Connection, cursor: sqlite3.Cursor):
+    cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS 'users'
+                    ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
+                    'tg_id' TEXT,
+                    'name' TEXT)
+    """)
+    con.commit()
+
+
+def admin_db_init(con: sqlite3.Connection, cursor: sqlite3.Cursor):
     cursor.execute("""
                 CREATE TABLE IF NOT EXISTS 'admins'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -40,32 +51,51 @@ def admin_db_init(con, cursor):
     con.commit()
 
 
-def delete_table(con, cursor, name):
+def delete_table(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name: str):
     cursor.execute(f"""
-        DROP TABLE '{name}'
+        DROP TABLE '{table_name}'
     """)
 
 
-def insert_value(con, cursor, value, db_name):
+def insert_value(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict, table_name: str):
     try:
         cursor.execute(
-            f"INSERT INTO '{db_name}' ('tg_id', 'time', 'name', 'change') VALUES ('{value['tg_id']}', '{value['time']}', '{value['username']}', {value['change']})")
+            f"INSERT INTO '{table_name}' ('tg_id', 'time', 'name', 'change') VALUES ('{value['tg_id']}', '{value['time']}', '{value['username']}', {value['change']})")
         con.commit()
     except Exception as e:
         print("FUNC: insert_value ERR:", e)
 
 
-def get_all(con, cursor, name):
-    cursor.execute(f"SELECT * from '{name}' ORDER BY 'db_id'")
+def insert_user(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict):
+    try:
+        cursor.execute(
+            f"INSERT INTO 'users' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
+        con.commit()
+    except Exception as e:
+        print("FUNC: insert_value ERR:", e)
+
+
+def get_all(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name: str) -> list:
+    cursor.execute(f"SELECT * from '{table_name}' ORDER BY 'db_id'")
     return cursor.fetchall()
 
 
-def get_all_admins(con, cursor):
+def get_all_admins(con: sqlite3.Connection, cursor: sqlite3.Cursor) -> list:
     cursor.execute(f"SELECT * from 'admins' ORDER BY 'db_id'")
     return cursor.fetchall()
 
 
-def insert_admin(con, cursor, value):
+def get_all_users(con: sqlite3.Connection, cursor: sqlite3.Cursor) -> list:
+    cursor.execute(f"SELECT * from 'users' ORDER BY 'db_id'")
+    return cursor.fetchall()
+
+
+def get_user(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str) -> list:
+    cursor.execute(f"SELECT * from 'users' WHERE 'tg_id' = '{tg_id}'")
+    return cursor.fetchall()
+
+
+def insert_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict):
     try:
         cursor.execute(
             f"INSERT INTO 'admins' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
@@ -74,10 +104,10 @@ def insert_admin(con, cursor, value):
         print("FUNC: insert_value ERR:", e)
 
 
-def remove_admin(con, cursor, id):
+def remove_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str):
     try:
         cursor.execute(
-            f"""DELETE FROM 'admins' WHERE tg_id = '{id}'"""
+            f"""DELETE FROM 'admins' WHERE tg_id = '{tg_id}'"""
         )
         lst = get_all_admins(con, cursor)
         delete_table(con, cursor, 'admins')
@@ -91,57 +121,56 @@ def remove_admin(con, cursor, id):
         print("FUNC: cancel_take ERR:", e)
 
 
-def get_all_in_order(con, cursor, name):
-    cursor.execute(f"SELECT * from '{name}' ORDER BY 'time'")
+def get_all_in_order(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name: str) -> list:
+    cursor.execute(f"SELECT * from '{table_name}' ORDER BY 'time'")
     return cursor.fetchall()
 
 
-
-def close_connection(con, cursor):
+def close_connection(con: sqlite3.Connection, cursor: sqlite3.Cursor):
     cursor.close()
     con.close()
 
 
-def get_status_by_id(con, cursor, id, db_name):
-    cursor.execute(f"select * from '{db_name}' where tg_id = {id} order by 'time'")
+def get_status_by_id(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str, table_name: str) -> list:
+    cursor.execute(f"select * from '{table_name}' where tg_id = '{tg_id}' order by 'time'")
     return cursor.fetchall()
 
 
-def get_status_by_no(con, cursor, id, db_name):
-    cursor.execute(f"select * from '{db_name}' where db_id = {id} order by 'time'")
+def get_status_by_no(con: sqlite3.Connection, cursor: sqlite3.Cursor, db_id: int, table_name: str) -> list:
+    cursor.execute(f"select * from '{table_name}' where db_id = {db_id} order by 'time'")
     return cursor.fetchall()
 
 
-def change_queue(con, cursor, db_id1, db_id2, db_name):
+def change_queue(con: sqlite3.Connection, cursor: sqlite3.Cursor, db_id1: list, db_id2: list, table_name: str):
     try:
         cursor.execute(
-            f"""UPDATE '{db_name}' SET tg_id = '{db_id2[1]}', name = '{db_id2[2]}', change = -1 WHERE db_id = {int(db_id1[0])}""")
+            f"""UPDATE '{table_name}' SET tg_id = '{db_id2[1]}', name = '{db_id2[2]}', change = -1 WHERE db_id = {int(db_id1[0])}""")
         con.commit()
         cursor.execute(
-            f"""UPDATE '{db_name}' SET tg_id = '{db_id1[1]}', name = '{db_id1[2]}', change = -1 WHERE db_id = {int(db_id2[0])}""")
+            f"""UPDATE '{table_name}' SET tg_id = '{db_id1[1]}', name = '{db_id1[2]}', change = -1 WHERE db_id = {int(db_id2[0])}""")
         con.commit()
     except Exception as e:
         print("FUNC: change_queue ERR:", e)
 
 
-def update_change(con, cursor, db_id, change, db_name):
+def update_change(con: sqlite3.Connection, cursor: sqlite3.Cursor, db_id: list, change: int, table_name):
     try:
         cursor.execute(
-            f"""UPDATE '{db_name}' SET tg_id = '{db_id[1]}', name = '{db_id[2]}', time = '{db_id[3]}', change = {int(change)} WHERE db_id = {int(db_id[0])}""")
+            f"""UPDATE '{table_name}' SET tg_id = '{db_id[1]}', name = '{db_id[2]}', time = '{db_id[3]}', change = {change} WHERE db_id = {int(db_id[0])}""")
         con.commit()
     except Exception as e:
         print("FUNC: update_change ERR:", e)
 
 
-def update_name(con, cursor, tg_id, name, db_name):
+def update_name(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str, name: str, table_name: str):
     try:
-        cursor.execute(f"""UPDATE '{db_name}' SET name = '{name}' WHERE tg_id = '{tg_id}'""")
+        cursor.execute(f"""UPDATE '{table_name}' SET name = '{name}' WHERE tg_id = '{tg_id}'""")
         con.commit()
     except Exception as e:
         print("FUNC: update_name ERR:", e)
 
 
-def make_admin(con, cursor, value):
+def make_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict):
     try:
         cursor.execute(f"INSERT INTO 'admins' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
         con.commit()
@@ -149,7 +178,7 @@ def make_admin(con, cursor, value):
         print("FUNC: make_admin ERR:", e)
 
 
-def is_admin(con, cursor, tg_id):
+def is_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str) -> bool:
     try:
         cursor.execute(f"SELECT * FROM 'admins' WHERE tg_id = '{tg_id}'")
         if len(cursor.fetchall()) >= 1:
@@ -161,26 +190,26 @@ def is_admin(con, cursor, tg_id):
         return False
 
 
-def cancel_take(con, cursor, id, name):
+def cancel_take(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str, table_name: str):
     try:
         cursor.execute(
-            f"""DELETE FROM '{name}' WHERE tg_id = '{id}'"""
+            f"""DELETE FROM '{table_name}' WHERE tg_id = '{tg_id}'"""
         )
-        lst = get_all(con, cursor, name)
-        delete_table(con, cursor, name)
-        database_init(con, cursor, name)
+        lst = get_all(con, cursor, table_name)
+        delete_table(con, cursor, table_name)
+        database_init(con, cursor, table_name)
         if lst:
             for human in lst:
                 insert_value(con, cursor, {'tg_id': human[1], 'time': human[3],
                                            'username': human[2],
-                                           'change': human[4]}, name)
+                                           'change': human[4]}, table_name)
         con.commit()
 
     except Exception as e:
         print("FUNC: cancel_take ERR:", e)
 
 
-def is_exist_table(con, cursor, name):
+def is_exist_table(con: sqlite3.Connection, cursor: sqlite3.Cursor, name: str) -> bool:
     try:
         cursor.execute(f"SELECT * FROM 'tables' WHERE name = '{name}'")
         if len(cursor.fetchall()) >= 1:
@@ -192,12 +221,12 @@ def is_exist_table(con, cursor, name):
         return False
 
 
-def get_all_tables(con, cursor):
+def get_all_tables(con: sqlite3.Connection, cursor: sqlite3.Cursor) -> list:
     cursor.execute("SELECT * from 'tables' ORDER BY 'name'")
     return cursor.fetchall()
 
 
-def insert_table(con, cursor, value):
+def insert_table(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict):
     try:
         cursor.execute(
             f"INSERT INTO 'tables' ('name', 'date', 'time') VALUES ('{value['name']}', '{value['date']}', '{value['time']}')")
@@ -206,7 +235,7 @@ def insert_table(con, cursor, value):
         print("FUNC: insert_table ERR:", e)
 
 
-def delete_table_from_table(con, cursor, name):
+def delete_table_from_table(con: sqlite3.Connection, cursor: sqlite3.Cursor, name: str):
     try:
         cursor.execute(f"DELETE FROM 'tables' where name = '{name}'")
         con.commit()
@@ -214,21 +243,21 @@ def delete_table_from_table(con, cursor, name):
         print("FUNC: delete_table_from_table ERR:", e)
 
 
-def get_table_name(con, cursor, no):
+def get_table_name(con: sqlite3.Connection, cursor: sqlite3.Cursor, no: int) -> str:
     tables = get_all_tables(con, cursor)
     if len(tables) >= no:
         return tables[no - 1][1]
-    return None
+    return ''
 
 
-def get_table_time(con, cursor, no):
+def get_table_time(con: sqlite3.Connection, cursor: sqlite3.Cursor, no: int) -> str:
     tables = get_all_tables(con, cursor)
     if len(tables) >= no:
         return tables[no - 1][3]
-    return None
+    return ''
 
 
-def set_table_time(con, cursor, table_name, time):
+def set_table_time(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name: str, time: str):
     try:
         cursor.execute(f"""UPDATE 'tables' SET time = '{time}' WHERE name = '{table_name}'""")
         con.commit()
@@ -238,6 +267,6 @@ def set_table_time(con, cursor, table_name, time):
 
 """FOR TESTS"""
 if __name__ == "__main__":
-    con, cursor = database_connect('queue')
-    database_init(con, cursor, 'queue')
-    delete_table(con, cursor, 'queue')
+    con_l, cursor_l = database_connect('queue')
+    database_init(con_l, cursor_l, 'queue')
+    delete_table(con_l, cursor_l, 'queue')
