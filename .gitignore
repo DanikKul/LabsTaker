@@ -1,3 +1,4 @@
+# This line ignores python3 cache shit
+__pycache__
+# This line ignores ./db and all shit inside it
 db
-db/queue
-config.json

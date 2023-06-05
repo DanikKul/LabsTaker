@@ -4,6 +4,7 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
+      network: host
     volumes:
       - ./db:/db
     command: bash /bot/run_bot.sh
