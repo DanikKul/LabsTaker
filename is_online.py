@@ -2,20 +2,20 @@ from datetime import datetime
 import smtplib, ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
 import psutil
 import time
-
 import pytz
+import os
 
 smtp_server = "smtp.gmail.com"
 port = 587
-sender_email = "labsbot150503@gmail.com"
+sender_email = os.getenv("BOT_EMAIL")
 receiver_emails = [
     "kulakovich2@gmail.com",
     "sasha@gravity-production.by"
 ]
-password = 'zukgrukmbqezlmid'
+password = os.getenv("BOT_EMAIL_PASS")
+
 
 context = ssl.create_default_context()
 

@@ -8,3 +8,5 @@ services:
     volumes:
       - ./db:/db
     command: bash /bot/run_bot.sh
+    env_file:
+      - ./.env

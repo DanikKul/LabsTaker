@@ -1,9 +1,10 @@
 import telebot as tt
 from datetime import datetime as dt
 from database import *
-import json
+import os
 import pytz
 import time as tm
+import dotenv as env
 
 # ___________________________________________________UTILS____________________________________________________________ #
 
@@ -71,14 +72,20 @@ ban = 300
 # _______________________________________________CONFIGURATION________________________________________________________ #
 
 
-# Read config file
-with open('config.json') as fp:
-    config = json.load(fp)
+env.load_dotenv()
+config = {}
+if os.getenv("BOT_ENV") == "local":
+    config['db_name'] = os.getenv('BOT_LOCAL_DB_NAME')
+elif os.getenv("BOT_ENV") == "docker":
+    config['db_name'] = os.getenv('BOT_DOCKER_DB_NAME')
+config['token'] = os.getenv('BOT_TOKEN')
+config['db_admin'] = os.getenv('BOT_DB_ADMIN')
+config['db_tables'] = os.getenv('BOT_DB_TABLES')
+config['group'] = os.getenv('BOT_GROUP')
+config['pass'] = os.getenv('BOT_PASS')
 
-# Create telebot object
 bot = tt.TeleBot(token=config['token'], parse_mode=None, num_threads=6)
 
-# Initialize databases
 con, cursor = database_connect(config['db_name'])
 db_init_admin(con, cursor)
 tables_database_init(con, cursor)
