@@ -36,12 +36,13 @@ def db_init_users(con: sqlite3.Connection, cursor: sqlite3.Cursor):
                 CREATE TABLE IF NOT EXISTS 'users'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
                     'tg_id' TEXT,
-                    'name' TEXT)
+                    'name' TEXT,
+                    'points' INTEGER)
     """)
     con.commit()
 
 
-def admin_db_init(con: sqlite3.Connection, cursor: sqlite3.Cursor):
+def db_init_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor):
     cursor.execute("""
                 CREATE TABLE IF NOT EXISTS 'admins'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -69,7 +70,7 @@ def insert_value(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict, t
 def insert_user(con: sqlite3.Connection, cursor: sqlite3.Cursor, value: dict):
     try:
         cursor.execute(
-            f"INSERT INTO 'users' ('tg_id', 'name') VALUES ('{value['tg_id']}', '{value['username']}')")
+            f"INSERT INTO 'users' ('tg_id', 'name', 'points') VALUES ('{value['tg_id']}', '{value['username']}', '{value['points']}')")
         con.commit()
     except Exception as e:
         print("FUNC: insert_value ERR:", e)
@@ -91,6 +92,7 @@ def get_all_users(con: sqlite3.Connection, cursor: sqlite3.Cursor) -> list:
 
 
 def get_user(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str) -> list:
+    print(tg_id)
     cursor.execute(f"SELECT * from 'users' WHERE 'tg_id' = '{tg_id}'")
     return cursor.fetchall()
 
@@ -111,10 +113,27 @@ def remove_admin(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str):
         )
         lst = get_all_admins(con, cursor)
         delete_table(con, cursor, 'admins')
-        admin_db_init(con, cursor)
+        db_init_admin(con, cursor)
         if lst:
             for human in lst:
                 insert_admin(con, cursor, {'tg_id': human[1], 'username': human[2]})
+        con.commit()
+
+    except Exception as e:
+        print("FUNC: cancel_take ERR:", e)
+
+
+def remove_user(con: sqlite3.Connection, cursor: sqlite3.Cursor, tg_id: str):
+    try:
+        cursor.execute(
+            f"""DELETE FROM 'users' WHERE tg_id = '{tg_id}'"""
+        )
+        lst = get_all_users(con, cursor)
+        delete_table(con, cursor, 'users')
+        db_init_users(con, cursor)
+        if lst:
+            for human in lst:
+                insert_user(con, cursor, {'tg_id': human[1], 'username': human[2]})
         con.commit()
 
     except Exception as e:
@@ -267,6 +286,6 @@ def set_table_time(con: sqlite3.Connection, cursor: sqlite3.Cursor, table_name: 
 
 """FOR TESTS"""
 if __name__ == "__main__":
-    con_l, cursor_l = database_connect('queue')
-    database_init(con_l, cursor_l, 'queue')
-    delete_table(con_l, cursor_l, 'queue')
+    con_test, cursor_test = database_connect('queue')
+    database_init(con_test, cursor_test, 'queue')
+    delete_table(con_test, cursor_test, 'queue')
