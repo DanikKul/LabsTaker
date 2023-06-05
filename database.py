@@ -1,8 +1,9 @@
 import sqlite3
 import sqlite3 as db
+from typing import Union
 
 
-def database_connect(database_name: str) -> [sqlite3.Connection, sqlite3.Cursor]:
+def database_connect(database_name: str) -> Union[sqlite3.Connection, sqlite3.Cursor]:
     conn = db.connect(database_name)
     curs = conn.cursor()
     return conn, curs
