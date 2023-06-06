@@ -59,7 +59,8 @@ help_admin_strings = {
     'admin_time': '_Меняет время занятия в очередь, просто напиши _`/admin_time`_, выбери одну из предложенных очередей, и измени ей дату и время занятия очереди_'
 }
 
-def add_queue_keyboard(session: Session, bot: TeleBot, message: Message, callback_data: str):
+
+def add_queue_keyboard_admin(message: Message, bot: TeleBot, callback_data: str, session: Session):
     markup = InlineKeyboardMarkup()
     tables = get_all_tables(session)
 
@@ -69,5 +70,23 @@ def add_queue_keyboard(session: Session, bot: TeleBot, message: Message, callbac
 
     for table in tables:
         markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"{callback_data} {table[1]}"))
+
+    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+
+
+def add_queue_keyboard_user(message: Message, bot: TeleBot, callback_data: str, session: Session):
+    markup = InlineKeyboardMarkup()
+    tables = get_all_tables(session)
+
+    idx = 1
+
+    if not tables:
+        bot.send_message(message.chat.id,
+                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
+        return
+
+    for table in tables:
+        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"{callback_data} {idx}"))
+        idx += 1
 
     bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)

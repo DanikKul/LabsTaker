@@ -5,7 +5,7 @@ from database import *
 from datetime import datetime as dt
 import pytz
 
-from handlers.utils import help_strings, help_admin_strings
+from handlers.utils import help_strings, help_admin_strings, add_queue_keyboard_user
 from configuration import get_config
 
 config = get_config()
@@ -63,7 +63,7 @@ def help_hd(message: Message, bot: TeleBot):
             markup.add(InlineKeyboardButton(f"{command}", callback_data=f"helpbutton {command}"))
 
     bot.send_message(message.chat.id, "Выберите команду", reply_markup=markup)
-    session = database_connect(config['db_name'])
+    close_connection(session)
 
 
 def callback_query_help(call: CallbackQuery, bot: TeleBot):
@@ -187,22 +187,7 @@ def callback_query_take(call: CallbackQuery, bot: TeleBot):
 
 def status_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"statusbutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'statusbutton', session)
     close_connection(session)
 
 
@@ -233,22 +218,7 @@ def callback_query_status(call: CallbackQuery, bot: TeleBot):
 
 def list_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"listbutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'listbutton', session)
     close_connection(session)
 
 
@@ -285,22 +255,7 @@ def callback_query_list(call: CallbackQuery, bot: TeleBot):
 
 def exchange_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"changebutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'changebutton', session)
     close_connection(session)
 
 
@@ -382,22 +337,7 @@ def callback_query_change_b(call: CallbackQuery, bot: TeleBot):
 
 def cancel_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"cancelbutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'cancelbutton', session)
     close_connection(session)
 
 
@@ -429,22 +369,7 @@ def callback_query_cancel(call: CallbackQuery, bot: TeleBot):
 
 def edit_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"editbutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'editbutton', session)
     close_connection(session)
 
 
@@ -506,22 +431,7 @@ def queues_hd(message: Message, bot: TeleBot):
 
 def time_hd(message: Message, bot: TeleBot):
     session = database_connect(config['db_name'])
-    markup = InlineKeyboardMarkup()
-    tables = get_all_tables(session)
-
-    idx = 1
-
-    if not tables:
-        bot.send_message(message.chat.id,
-                         text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-        close_connection(session)
-        return
-
-    for table in tables:
-        markup.add(InlineKeyboardButton(f"{table[1]}", callback_data=f"timebutton {idx}"))
-        idx += 1
-
-    bot.send_message(message.chat.id, "Выберите очередь", reply_markup=markup)
+    add_queue_keyboard_user(message, bot, 'timebutton', session)
     close_connection(session)
 
 
@@ -556,7 +466,7 @@ def callback_su_hd(message: Message, bot: TeleBot):
     close_connection(session)
 
 
-def ban_hd(session: Session, bot: TeleBot, message: Message):
+def ban_hd(message: Message, bot: TeleBot):
     # if is_spam(message.chat.id):
     #     bot.send_message(message.chat.id,
     #                      text=f"{int(spams[message.chat.id]['banned'] - int(tm.time()))} секунд осталось до разбана")
@@ -600,38 +510,39 @@ user_handlers_names = [
     'ban'
 ]
 
-callback_query_user_handlers = [
-    callback_query_take,
-    callback_query_help,
-    callback_query_edit,
-    callback_query_time,
-    callback_query_cancel,
-    callback_query_change_a,
-    callback_query_change_b,
-    callback_query_status,
-    callback_query_list,
-]
-
-callback_query_user_handlers_func = [
-    'takebutton',
-    'helpbutton',
-    'editbutton',
-    'timebutton',
-    'cancelbutton',
-    'changebutton',
-    'change2button',
-    'statusbutton',
-    'listbutton'
-]
-
 
 def register_user_handlers(bot: TeleBot):
     try:
         for idx in range(len(user_handlers)):
             bot.register_message_handler(user_handlers[idx], commands=[user_handlers_names[idx]], pass_bot=True)
 
-        for idx in range(len(callback_query_user_handlers)):
-            bot.register_callback_query_handler(callback=callback_query_user_handlers[idx], func=lambda call: call.data and call.data.startswith(callback_query_user_handlers_func[idx]), pass_bot=True)
-        print(bot.callback_query_handlers)
+        bot.register_callback_query_handler(callback=callback_query_take,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('takebutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_help,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('helpbutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_edit,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('editbutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_time,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('timebutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_cancel,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('cancelbutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_change_a,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('changebutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_change_b,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('change2button'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_status,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('statusbutton'),
+                                            pass_bot=True)
+        bot.register_callback_query_handler(callback=callback_query_list,
+                                            func=lambda call: len(call.data) > 0 and call.data.startswith('listbutton'),
+                                            pass_bot=True)
+        import pprint
     except Exception as e:
         print(e)

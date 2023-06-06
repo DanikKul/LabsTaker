@@ -4,6 +4,7 @@ import time as tm
 import dotenv as env
 from database import *
 from handlers import user
+from handlers import su
 # from handlers.user import help_hd, su_hd, ban_hd, edit_hd, list_hd, take_hd, time_hd, login_hd, start_hd, cancel_hd, queues_hd, status_hd, exchange_hd
 # from handlers.su import admin_kick_hd, admin_users_hd, admin_edit_hd, admin_list_hd, admin_time_hd, admin_change_hd, admin_create_hd, admin_delete_hd, admin_remove_hd
 
@@ -89,4 +90,5 @@ def start():
 
 if __name__ == "__main__":
     user.register_user_handlers(bot)
+    su.register_admin_handlers(bot)
     start()
