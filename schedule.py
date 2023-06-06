@@ -13,6 +13,7 @@ groups = {
     2: '2ПГ'
 }
 
+
 def get_schedule():
     week: int
     schedule: dict
@@ -34,7 +35,6 @@ def get_schedule():
                     out[day] = {}
                     out[day]['subject'] = []
                 out[day]['subject'].append(f"{subject['subject']} {groups[subject['numSubgroup']]}")
-                # out[day]['subject']['group'] = subject['numSubgroup']
     return out
 
 

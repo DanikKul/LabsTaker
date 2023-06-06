@@ -7,6 +7,7 @@ import time
 import pytz
 import os
 
+time.sleep(10)
 smtp_server = "smtp.gmail.com"
 port = 587
 sender_email = os.getenv("BOT_EMAIL")
@@ -50,7 +51,6 @@ def send(receiver):
 
 
 if __name__ == "__main__":
-    time.sleep(10)
     while True:
         if not is_online():
             for r in receiver_emails:
