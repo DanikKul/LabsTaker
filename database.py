@@ -19,7 +19,6 @@ def database_connect(db_name: str) -> Session:
 
 
 def tables_database_init(session: Session):
-
     session.curs.execute("""
                 CREATE TABLE IF NOT EXISTS 'tables'
                     ('db_id' INTEGER PRIMARY KEY AUTOINCREMENT,  
