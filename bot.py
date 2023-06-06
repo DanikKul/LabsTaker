@@ -22,10 +22,11 @@ env.load_dotenv()
 
 config = get_config()
 
+tt.apihelper.ENABLE_MIDDLEWARE = True
+
 bot = tt.TeleBot(token=config['token'], parse_mode=None, num_threads=6)
 
 session = database_connect(config['db_name'])
-
 db_init_admin(session)
 tables_database_init(session)
 db_init_users(session)
@@ -68,20 +69,17 @@ def is_logged(user_id: int) -> bool:
     return False
 
 
+@bot.message_handler()
+def message_hd(message: tt.types.Message):
+    message_filter(message.chat.id)
+
 
 def message_filter(tg_id: int) -> bool:
     if is_spam(tg_id):
         return False
-
     if not is_logged(tg_id):
         return False
-
     return True
-
-
-# @bot.message_handler()
-# def message_hd(message: tt.types.Message):
-#     message_filter(message.chat.id)
 
 
 def start():
