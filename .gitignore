@@ -2,5 +2,5 @@
 __pycache__
 # This line ignores ./db and all shit inside it
 db
-# This line ignores .env file and shit inside it
+# This line ignores .env
 ./.env
