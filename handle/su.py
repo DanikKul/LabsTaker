@@ -4,7 +4,7 @@ from database import *
 from datetime import datetime as dt
 import pytz
 from configuration import get_config
-from handlers.utils import add_queue_keyboard_admin
+from handle.utils import add_queue_keyboard_admin
 
 config = get_config()
 
@@ -409,36 +409,24 @@ admin_handlers_names = [
     'create'
 ]
 
+admin_query_handlers = [
+    callback_query_admin_change_hd,
+    callback_query_admin_remove_hd_a,
+    callback_query_admin_remove_hd_b,
+    callback_query_admin_edit_hd_a,
+    callback_query_admin_edit_hd_b,
+    callback_query_admin_time_hd,
+    callback_query_admin_delete_hd,
+    callback_query_admin_kick_hd,
+]
 
-def register_admin_handlers(bot: TeleBot):
-    try:
-        for idx in range(len(admin_handlers)):
-            bot.register_message_handler(admin_handlers[idx], commands=[f'admin_{admin_handlers_names[idx]}'], pass_bot=True)
-
-        bot.register_callback_query_handler(callback=callback_query_admin_kick_hd,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('adminkickbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_remove_hd_a,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('adminremovebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_remove_hd_b,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('adminremove2button'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_change_hd,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('adminchangebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_edit_hd_a,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('admineditbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_edit_hd_b,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('adminedit2button'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_time_hd,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('admintimebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_admin_delete_hd,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('admindeletebutton'),
-                                            pass_bot=True)
-        import pprint
-    except Exception as e:
-        print(e)
+admin_query_handlers_names = [
+    'adminchangebutton',
+    'adminremovebutton',
+    'adminremove2button',
+    'admineditbutton',
+    'adminedit2button',
+    'admintimebutton',
+    'admindeletebutton',
+    'adminkickbutton',
+]

@@ -5,7 +5,7 @@ from database import *
 from datetime import datetime as dt
 import pytz
 
-from handlers.utils import help_strings, help_admin_strings, add_queue_keyboard_user
+from handle.utils import help_strings, help_admin_strings, add_queue_keyboard_user
 from configuration import get_config
 
 config = get_config()
@@ -510,39 +510,26 @@ user_handlers_names = [
     'ban'
 ]
 
+user_query_handlers = [
+    callback_query_time,
+    callback_query_edit,
+    callback_query_cancel,
+    callback_query_list,
+    callback_query_status,
+    callback_query_help,
+    callback_query_change_a,
+    callback_query_change_b,
+    callback_query_take,
+]
 
-def register_user_handlers(bot: TeleBot):
-    try:
-        for idx in range(len(user_handlers)):
-            bot.register_message_handler(user_handlers[idx], commands=[user_handlers_names[idx]], pass_bot=True)
-
-        bot.register_callback_query_handler(callback=callback_query_take,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('takebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_help,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('helpbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_edit,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('editbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_time,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('timebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_cancel,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('cancelbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_change_a,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('changebutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_change_b,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('change2button'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_status,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('statusbutton'),
-                                            pass_bot=True)
-        bot.register_callback_query_handler(callback=callback_query_list,
-                                            func=lambda call: len(call.data) > 0 and call.data.startswith('listbutton'),
-                                            pass_bot=True)
-        import pprint
-    except Exception as e:
-        print(e)
+user_query_handlers_names = [
+    'timebutton',
+    'editbutton',
+    'cancelbutton',
+    'listbutton',
+    'statusbutton',
+    'helpbutton',
+    'changebutton',
+    'change2button',
+    'takebutton',
+]
