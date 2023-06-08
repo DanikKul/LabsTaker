@@ -4,15 +4,14 @@ from telebot.util import extract_arguments
 from database import *
 from datetime import datetime as dt
 import pytz
+import time as tm
 
 from handle.utils import help_strings, help_admin_strings, add_queue_keyboard_user
-from configuration import get_config
+from middleware import Middleware
+from environment import Environment
 
-config = get_config()
 
-
-def start_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def start_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     bot.send_message(message.chat.id, text='Привет')
     bot.send_message(message.chat.id, text='Вот все команды, которые ты можешь использовать')
     bot.send_message(message.chat.id, parse_mode='MarkdownV2',
@@ -26,17 +25,15 @@ def start_hd(message: Message, bot: TeleBot):
                      parse_mode='MarkdownV2')
     bot.send_message(message.chat.id,
                      text="Предупреждаю, в боте стоит антиспам система, если вы начнете спамить вам выдадут бан на 5 минут, если это вас не остановит, вас еще и тг забанит на неопределенное время.")
-    close_connection(session)
 
 
-def login_hd(message: Message, bot: TeleBot):
+def login_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     bot.send_message(message.chat.id, 'Введите номер группы')
-    bot.register_next_step_handler(message, callback_login_handler, bot)
+    bot.register_next_step_handler(message, callback_login_handler, bot, session, config)
 
 
-def callback_login_handler(message: Message, bot: TeleBot):
+def callback_login_handler(message: Message, bot: TeleBot, session: Session, config: Environment):
     try:
-        session = database_connect(config['db_name'])
         if message.text == config['group']:
             insert_user(session, {"tg_id": message.chat.id,
                                   "username": f"{message.from_user.first_name if message.from_user.first_name is not None else ''} {message.from_user.last_name if message.from_user.last_name is not None else ''}",
@@ -45,14 +42,12 @@ def callback_login_handler(message: Message, bot: TeleBot):
             bot.send_message(message.chat.id, 'Вы вошли в систему!')
         else:
             bot.send_message(message.chat.id, text="Понятия не имею, кто ты, герой")
-            close_connection(session)
     except Exception as e:
         bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_login_handler ERR:", e)
 
 
-def help_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def help_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     markup = InlineKeyboardMarkup()
 
     for command in help_strings:
@@ -63,10 +58,9 @@ def help_hd(message: Message, bot: TeleBot):
             markup.add(InlineKeyboardButton(f"{command}", callback_data=f"helpbutton {command}"))
 
     bot.send_message(message.chat.id, "Выберите команду", reply_markup=markup)
-    close_connection(session)
 
 
-def callback_query_help(call: CallbackQuery, bot: TeleBot):
+def callback_query_help(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         command = call.data[11:]
         if help_strings.get(command):
@@ -84,9 +78,8 @@ def callback_query_help(call: CallbackQuery, bot: TeleBot):
         print(e)
 
 
-def take_hd(message: Message, bot: TeleBot):
+def take_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     try:
-        session = database_connect(config['db_name'])
         no = extract_arguments(message.text)
         no = int(no)
 
@@ -100,7 +93,6 @@ def take_hd(message: Message, bot: TeleBot):
 
             if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
                 bot.send_message(message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
-                close_connection(session)
                 return
 
             table_name = get_table_name(session, int(no))
@@ -110,7 +102,6 @@ def take_hd(message: Message, bot: TeleBot):
                 for human in lst:
                     if human[1] == str(message.chat.id):
                         bot.send_message(message.chat.id, text=f'Вы уже заняли очередь')
-                        close_connection(session)
                         return
 
             time_s = time.strftime("%H:%M:%S:%f")
@@ -122,12 +113,10 @@ def take_hd(message: Message, bot: TeleBot):
 
             bot.send_message(message.chat.id, text=f'Время получения запроса: {time_s}')
             bot.send_message(message.chat.id, text=f'Вы заняли очередь в {get_table_name(session, no)}')
-            close_connection(session)
         except Exception as e:
             bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
             print("FUNC: callback_take_handler ERR:", e)
     except Exception as e:
-        session = database_connect(config['db_name'])
         markup = InlineKeyboardMarkup()
         tables = get_all_tables(session)
 
@@ -136,7 +125,6 @@ def take_hd(message: Message, bot: TeleBot):
         if not tables:
             bot.send_message(message.chat.id,
                              text="Нет ни одной очереди. Если скоро сдавать напишите админам, чтобы добавили очередь")
-            close_connection(session)
             return
 
         for table in tables:
@@ -144,12 +132,10 @@ def take_hd(message: Message, bot: TeleBot):
             idx += 1
 
         bot.send_message(message.chat.id, "Занять очередь", reply_markup=markup)
-        close_connection(session)
 
 
-def callback_query_take(call: CallbackQuery, bot: TeleBot):
+def callback_query_take(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
-        session = database_connect(config['db_name'])
         no = int(call.data[11:])
         datetime = get_table_time(session, no).split(' ')
         day, month, year = map(int, datetime[0].split('-'))
@@ -159,17 +145,14 @@ def callback_query_take(call: CallbackQuery, bot: TeleBot):
         if time < dt.strptime(f'{day}-{month}-{year} {hour}:{minute}', '%d-%m-%Y %H:%M'):
             bot.send_message(call.message.chat.id, f"Слишком рано: {time.strftime('%H:%M:%S:%f')}")
             bot.delete_message(call.message.chat.id, call.message.message_id)
-            close_connection(session)
             return
         table_name = get_table_name(session, int(no))
         lst = get_all(session, table_name)
         if lst is not None:
             for human in lst:
                 if human[1] == str(call.message.chat.id):
-                    close_connection(session)
                     bot.send_message(call.message.chat.id, text=f'Вы уже заняли очередь')
                     bot.delete_message(call.message.chat.id, call.message.message_id)
-                    close_connection(session)
                     return
         time_s = time.strftime("%H:%M:%S:%f")
         insert_value(session, {'tg_id': call.message.chat.id, 'time': time,
@@ -178,29 +161,23 @@ def callback_query_take(call: CallbackQuery, bot: TeleBot):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id,
                          text=f'Вы заняли очередь в {get_table_name(session, no)}\nВремя: {time_s}')
-        close_connection(session)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_take_handler ERR:", e)
 
 
-def status_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def status_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'statusbutton', session)
-    close_connection(session)
 
 
-def callback_query_status(call: CallbackQuery, bot: TeleBot):
+def callback_query_status(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[13:])
-        session = database_connect(config['db_name'])
         if not is_exist_table(session, get_table_name(session, no)):
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            close_connection(session)
             return
         if not get_status_by_id(session, str(call.message.chat.id), get_table_name(session, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -209,66 +186,52 @@ def callback_query_status(call: CallbackQuery, bot: TeleBot):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              f"Вы {get_status_by_id(session, str(call.message.chat.id), get_table_name(session, no))[0][0]} в очереди {get_table_name(session, no)}")
-        close_connection(session)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_status_handler ERR:", e)
 
 
-def list_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def list_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'listbutton', session)
-    close_connection(session)
 
 
-def callback_query_list(call: CallbackQuery, bot: TeleBot):
+def callback_query_list(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[11:])
-        session = database_connect(config['db_name'])
         if not is_exist_table(session, get_table_name(session, no)):
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            close_connection(session)
             return
         lst = get_all_in_order(session, get_table_name(session, no))
         if not lst:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text="Никто не занял очередь :(")
-            close_connection(session)
             return
         else:
             s = f"Очередь {get_table_name(session, no)}:\n"
             for human in lst:
                 s += f"№{str(human[0])} {str(human[2])} Время: {str(human[3])}\n"
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text=s)
-            close_connection(session)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_list_handler ERR:", e)
 
 
-def exchange_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def exchange_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'changebutton', session)
-    close_connection(session)
 
 
-def callback_query_change_a(call: CallbackQuery, bot: TeleBot):
+def callback_query_change_a(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[13:])
-        session = database_connect(config['db_name'])
         if not is_exist_table(session, get_table_name(session, no)):
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            close_connection(session)
             return
         lst = get_all(session, get_table_name(session, no))
         exist = False
@@ -278,7 +241,6 @@ def callback_query_change_a(call: CallbackQuery, bot: TeleBot):
         if not exist:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text=f'Ты не занял очередь :(')
-            close_connection(session)
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         markup = InlineKeyboardMarkup()
@@ -288,29 +250,25 @@ def callback_query_change_a(call: CallbackQuery, bot: TeleBot):
                                             callback_data=f"change2button {human[0]} {get_table_name(session, no)}"))
             idx += 1
         bot.send_message(call.message.chat.id, "Выбери человека", reply_markup=markup)
-        close_connection(session)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_change_handler ERR:", e)
 
 
-def callback_query_change_b(call: CallbackQuery, bot: TeleBot):
+def callback_query_change_b(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         data = call.data.split(' ')
         no = int(data[1])
         table_name = data[2]
-        session = database_connect(config['db_name'])
         lst = get_all(session, table_name)
         if not lst:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text="Никто не занял очередь :(")
-            close_connection(session)
             return
         if len(lst) < no:
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, text="Такого номера не существует")
-            close_connection(session)
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Запрос на изменение очереди принят')
@@ -327,7 +285,6 @@ def callback_query_change_b(call: CallbackQuery, bot: TeleBot):
                              text=f"{get_status_by_id(session, str(call.message.chat.id), table_name)[0][2]} хочет с тобой поменяться (№{get_status_by_id(session, str(call.message.chat.id), table_name)[0][0]})")
             bot.send_message(call.message.chat.id,
                              'Второй человек тоже должен поменяться с тобой местом чтобы очередь изменилась')
-        close_connection(session)
 
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -335,30 +292,23 @@ def callback_query_change_b(call: CallbackQuery, bot: TeleBot):
         bot.send_message(call.message.chat.id, 'Такого номера не существует')
 
 
-def cancel_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def cancel_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'cancelbutton', session)
-    close_connection(session)
 
 
-def callback_query_cancel(call: CallbackQuery, bot: TeleBot):
+def callback_query_cancel(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[13:])
-        session = database_connect(config['db_name'])
         if not is_exist_table(session, get_table_name(session, no)):
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            close_connection(session)
             return
         if not get_status_by_id(session, str(call.message.chat.id), get_table_name(session, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
-            close_connection(session)
             return
         cancel_take(session, str(call.message.chat.id), get_table_name(session, no))
-        close_connection(session)
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text='Ты освободил свое место в очереди')
     except Exception as e:
@@ -367,52 +317,43 @@ def callback_query_cancel(call: CallbackQuery, bot: TeleBot):
         print("FUNC: callback_cancel_handler ERR:", e)
 
 
-def edit_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def edit_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'editbutton', session)
-    close_connection(session)
 
 
-def callback_query_edit(call: CallbackQuery, bot: TeleBot):
+def callback_query_edit(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[11:])
-        session = database_connect(config['db_name'])
         if not is_exist_table(session, get_table_name(session, no)):
-            close_connection(session)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              text=f'Такой очереди нет, посмотрите список доступных очередей в /queues')
-            close_connection(session)
             return
         if not get_status_by_id(session, str(call.message.chat.id), get_table_name(session, no)):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id, f"Вы не заняли очередь :(")
-            close_connection(session)
             return
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text='Напиши имя и фамилию')
         bot.register_next_step_handler(call.message, callback_edit_handler,
-                                       get_table_name(session, no), bot)
-        close_connection(session)
+                                       get_table_name(session, no), bot, session, config)
     except Exception as e:
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print("FUNC: callback_edit_handler ERR:", e)
 
 
-def callback_edit_handler(message: Message, table_name: str, bot: TeleBot):
+def callback_edit_handler(message: Message, table_name: str, bot: TeleBot, session: Session, config: Environment):
     try:
-        session = database_connect(config['db_name'])
         update_name(session, str(message.chat.id), message.text, table_name)
         bot.send_message(message.chat.id, text='Готово')
-        close_connection(session)
     except Exception as e:
         bot.send_message(message.chat.id, 'Что-то не так с вводом, попробуй еще раз')
         print(e)
 
 
-def queues_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def queues_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
+
     tables = get_all_tables(session)
 
     if tables:
@@ -429,16 +370,13 @@ def queues_hd(message: Message, bot: TeleBot):
     close_connection(session)
 
 
-def time_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def time_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     add_queue_keyboard_user(message, bot, 'timebutton', session)
-    close_connection(session)
 
 
-def callback_query_time(call: CallbackQuery, bot: TeleBot):
+def callback_query_time(call: CallbackQuery, bot: TeleBot, session: Session, config: Environment):
     try:
         no = int(call.data[11:])
-        session = database_connect(config['db_name'])
         get_table_time(session, no)
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, text=get_table_time(session, no))
@@ -448,13 +386,12 @@ def callback_query_time(call: CallbackQuery, bot: TeleBot):
         print("FUNC: callback_time_handler ERR:", e)
 
 
-def su_hd(message: Message, bot: TeleBot):
+def su_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     bot.send_message(message.chat.id, text="Введи пароль")
-    bot.register_next_step_handler(message, callback_su_hd, bot)
+    bot.register_next_step_handler(message, callback_su_hd, bot, session, config)
 
 
-def callback_su_hd(message: Message, bot: TeleBot):
-    session = database_connect(config['db_name'])
+def callback_su_hd(message: Message, bot: TeleBot, session: Session, config: Environment):
     if message.text != config['pass']:
         bot.send_message(message.chat.id, text="Ты не знаешь пароля ухади!!1!")
         return
@@ -463,18 +400,15 @@ def callback_su_hd(message: Message, bot: TeleBot):
                          "username": f"{message.from_user.first_name if message.from_user.first_name is not None else ''} {message.from_user.last_name if message.from_user.last_name is not None else ''}"})
 
     bot.send_message(message.chat.id, text="Ты админ")
-    close_connection(session)
 
 
-def ban_hd(message: Message, bot: TeleBot):
-    # if is_spam(message.chat.id):
-    #     bot.send_message(message.chat.id,
-    #                      text=f"{int(spams[message.chat.id]['banned'] - int(tm.time()))} секунд осталось до разбана")
-    #     return
-    # elif not is_logged(message.chat.id):
-    #     return
-    # else:
-    #     bot.send_message(message.chat.id, text="Вы не забанены")
+def ban_hd(message: Message, bot: TeleBot, session: Session, middleware: Middleware, config: Environment):
+    if middleware.is_spam(bot, message.chat.id):
+        bot.send_message(message.chat.id,
+                         text=f"{int(middleware.spams[message.chat.id]['banned'] - int(tm.time()))} секунд осталось до разбана")
+        return
+    else:
+        bot.send_message(message.chat.id, text="Вы не забанены")
     pass
 
 

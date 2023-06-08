@@ -1,26 +1,8 @@
 from telebot import TeleBot
 from telebot.types import Message, CallbackQuery
-from dotenv import load_dotenv
-from os import getenv
-from typing import Dict, Callable
-from dispatchers import dispatch_handlers, dispatch_callback_query
-
-
-class Environment:
-    def __init__(self, envs: Dict[str, str]):
-        if not load_dotenv():
-            raise RuntimeError("missing .env in cwd")
-
-        self.__env: Dict[str, str] = {}
-
-        for envname, envkey in envs.items():
-            value: (str | None) = getenv(envkey)
-
-            if value is not None:
-                self.__env.update({envname: value})
-
-    def __getitem__(self, item):
-        return self.__env[item]
+from typing import Callable
+from dispatchers import Dispatch
+from environment import Environment
 
 
 class Bot:
@@ -57,6 +39,7 @@ class Bot:
 
 if __name__ == "__main__":
     bot = Bot()
-    bot.register_message_dispatcher(dispatch_handlers)
-    bot.register_callback_query_dispatcher(dispatch_callback_query)
+    dispatch = Dispatch(bot.get_config())
+    bot.register_message_dispatcher(dispatch.dispatch_handlers())
+    bot.register_callback_query_dispatcher(dispatch.dispatch_callback_query())
     bot.start()
