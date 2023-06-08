@@ -13,15 +13,18 @@ class Session:
         self.curs.execute(query)
         self.conn.commit()
 
-
     def fetch(self, query: str) -> List[Any]:
         self.curs.execute(query)
         return self.curs.fetchall()
 
+    def close(self) -> None:
+        self.curs.close()
+        self.conn.close()
+
 
 # todo: implement external interface for session
 def database_connect(db_name: str) -> Session:
-    conn = db.connect(db_name)
+    conn = db.connect(db_name, check_same_thread=False)
     curs = conn.cursor()
     return Session(conn, curs)
 
@@ -87,7 +90,7 @@ def insert_user(session: Session, value: dict) -> None:
             INSERT INTO 'users' ('tg_id', 'name', 'points') VALUES ('{value['tg_id']}', '{value['username']}', '{value['points']}')
         """)
     except Exception as e:
-        print("FUNC: insert_value ERR:", e)
+        print("FUNC: insert_user ERR:", e)
 
 
 def get_all(session: Session, tb_name: str) -> List[Any]:
@@ -322,10 +325,3 @@ def set_table_time(session: Session, tb_name: str, time: str) -> None:
         """)
     except Exception as e:
         print("FUNC: set_table_time ERR:", e)
-
-
-"""FOR TESTS"""
-if __name__ == "__main__":
-    con_test, cursor_test = database_connect('queue')
-    database_init(con_test, cursor_test, 'queue')
-    delete_table(con_test, cursor_test, 'queue')
